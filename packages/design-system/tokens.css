@@ -1,0 +1,30 @@
+/* PERMTPA ONE design tokens — midnight navy, warm white, restrained emerald. */
+:root {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --bg: #faf8f4; --bg-subtle: #f3f0ea; --surface: #ffffff; --surface-raised: #ffffff;
+  --border: #e7e2d9; --border-strong: #d6cfc2;
+  --fg: #0b1426; --fg-muted: #4b566b; --fg-subtle: #7b8496;
+  --navy: #0b1426; --navy-2: #121e38;
+  --accent: #0f8a63; --accent-hover: #0c7452; --accent-soft: #e3f3ec; --accent-fg: #ffffff;
+  --danger: #c2410c; --danger-soft: #fdeee6; --warning: #a16207; --warning-soft: #fbf1d9;
+  --ring: #0f8a63;
+  --shadow-sm: 0 1px 2px rgb(11 20 38 / 0.05);
+  --shadow-md: 0 4px 16px -4px rgb(11 20 38 / 0.08), 0 1px 2px rgb(11 20 38 / 0.04);
+  --shadow-lg: 0 24px 60px -20px rgb(11 20 38 / 0.22), 0 2px 6px rgb(11 20 38 / 0.05);
+  --chart-1: #0f8a63; --chart-2: #0b1426; --chart-3: #b8a98a;
+  --radius: 12px;
+}
+:root[data-theme="dark"] {
+  --bg: #070d1a; --bg-subtle: #0a1224; --surface: #0d1730; --surface-raised: #111d3a;
+  --border: #1c2947; --border-strong: #2a3a5f;
+  --fg: #f4f1ea; --fg-muted: #a5aec2; --fg-subtle: #6f7a92;
+  --accent: #2fc58f; --accent-hover: #4ad6a2; --accent-soft: #0e2b2a; --accent-fg: #04140f;
+  --danger: #fb923c; --danger-soft: #2a1710; --warning: #facc15; --warning-soft: #2a2208;
+  --ring: #2fc58f;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 30px 70px -24px rgb(0 0 0 / 0.7);
+  --chart-1: #2fc58f; --chart-2: #f4f1ea; --chart-3: #5b6b92;
+}

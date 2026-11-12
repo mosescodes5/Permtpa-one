@@ -1,0 +1,1 @@
+{ "name": "@permtpa/design-system", "version": "0.1.0", "private": true, "description": "PERMTPA ONE design tokens", "files": ["tokens.css"] }

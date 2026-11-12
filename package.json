@@ -1,0 +1,15 @@
+{
+  "name": "permtpa-one",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PERMTPA ONE — a technology product by PERMTPA",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w @permtpa/web",
+    "build": "npm run build -w @permtpa/web",
+    "lint": "npm run lint -w @permtpa/web",
+    "typecheck": "npm run typecheck -w @permtpa/web",
+    "test": "npm run test -w @permtpa/web",
+    "test:e2e": "npm run test:e2e -w @permtpa/web"
+  }
+}
