@@ -1,4 +1,5 @@
-use permtpa_api::{app, config::{Config, Environment}, db};
+use permtpa_api::{app, config::{Config, Environment}, db, mailer::Mailer};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt};
 
@@ -24,11 +25,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = db::connect(&cfg.database_url, 10).await?;
     let redis = Arc::new(redis::Client::open(cfg.redis_url.as_str())?);
-    let app = app::router(app::AppState { pool, redis });
+    // Development captures mail in memory (readable at /v1/dev/outbox). No SMTP transport is wired yet, so every
+    // other environment refuses to send rather than pretending to — see PROGRESS.md "Known issues".
+    let mailer = if cfg.environment == Environment::Development { Mailer::capture() } else { Mailer::Disabled };
+    if matches!(mailer, Mailer::Disabled) {
+        tracing::warn!("no mail transport configured: verification and reset emails will NOT be delivered");
+    }
+    let state = app::AppState::new(pool, redis, cfg.clone(), mailer);
+    let app = app::router(state);
 
     let listener = tokio::net::TcpListener::bind(cfg.bind).await?;
     tracing::info!(addr = %cfg.bind, "listening");
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).with_graceful_shutdown(shutdown_signal()).await?;
     tracing::info!("shutdown complete");
     Ok(())
 }

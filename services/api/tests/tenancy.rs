@@ -1,46 +1,11 @@
 //! Integration tests that exercise tenant isolation through the REAL Rust code path (`begin_tenant_tx`)
 //! against a real PostgreSQL. Run with:
 //!   TEST_ADMIN_DATABASE_URL=postgres://postgres:pw@127.0.0.1:5432/postgres cargo test -p permtpa-api -- --ignored
-use permtpa_api::db::{MIGRATOR, TenantContext, begin_tenant_tx};
-use sqlx::{AssertSqlSafe, PgPool, postgres::PgPoolOptions};
+mod common;
+use common::TestDb;
+use permtpa_api::db::{TenantContext, begin_tenant_tx};
+use sqlx::{AssertSqlSafe, PgPool};
 use uuid::Uuid;
-
-struct TestDb {
-    admin: PgPool,
-    name: String,
-    app: PgPool, // max_connections = 1 on purpose: every transaction reuses the SAME connection
-}
-
-impl TestDb {
-    async fn create() -> Self {
-        let admin_url = std::env::var("TEST_ADMIN_DATABASE_URL").expect("set TEST_ADMIN_DATABASE_URL to run integration tests");
-        let admin = PgPoolOptions::new().max_connections(2).connect(&admin_url).await.expect("admin connect");
-        let name = format!("permtpa_it_{}", Uuid::new_v4().simple());
-        for role in ["permtpa_migrator", "permtpa_app"] {
-            sqlx::query(AssertSqlSafe(format!(
-                "do $$ begin if not exists (select from pg_roles where rolname='{role}') then create role {role} login password 'it_pw' nosuperuser nobypassrls; end if; end $$"
-            )))
-            .execute(&admin).await.unwrap();
-            // Roles are cluster-wide and may pre-exist with another password: always set it.
-            sqlx::query(AssertSqlSafe(format!("alter role {role} password 'it_pw'"))).execute(&admin).await.unwrap();
-        }
-        sqlx::query(AssertSqlSafe(format!("create database {name} owner permtpa_migrator"))).execute(&admin).await.unwrap();
-        sqlx::query(AssertSqlSafe(format!("revoke all on database {name} from public"))).execute(&admin).await.unwrap();
-        sqlx::query(AssertSqlSafe(format!("grant connect on database {name} to permtpa_app"))).execute(&admin).await.unwrap();
-
-        let url_for = |user: &str| admin_url.rsplit_once('/').map(|(base, _)| base.replacen(&admin_url[admin_url.find("://").unwrap() + 3..admin_url.find('@').unwrap()], &format!("{user}:it_pw"), 1)).unwrap() + "/" + &name;
-        let migrator = PgPoolOptions::new().max_connections(1).connect(&url_for("permtpa_migrator")).await.expect("migrator connect");
-        MIGRATOR.run(&migrator).await.expect("migrations apply");
-        migrator.close().await;
-        let app = PgPoolOptions::new().max_connections(1).connect(&url_for("permtpa_app")).await.expect("app connect");
-        Self { admin, name, app }
-    }
-
-    async fn drop(self) {
-        self.app.close().await;
-        sqlx::query(AssertSqlSafe(format!("drop database if exists {} with (force)", self.name))).execute(&self.admin).await.unwrap();
-    }
-}
 
 async fn register(pool: &PgPool, email: &str) -> Uuid {
     let mut tx = begin_tenant_tx(pool, TenantContext::default()).await.unwrap();
@@ -66,7 +31,7 @@ async fn count(pool: &PgPool, ctx: TenantContext, table: &str) -> i64 {
 #[tokio::test]
 #[ignore = "requires PostgreSQL: set TEST_ADMIN_DATABASE_URL"]
 async fn tenants_are_isolated_through_the_rust_path() {
-    let db = TestDb::create().await;
+    let db = TestDb::create(1).await;
     let (a, b) = (register(&db.app, "a@a.test").await, register(&db.app, "b@b.test").await);
     let (org_a, org_b) = (create_org(&db.app, a, "org-a").await, create_org(&db.app, b, "org-b").await);
 
@@ -86,7 +51,7 @@ async fn tenants_are_isolated_through_the_rust_path() {
 #[tokio::test]
 #[ignore = "requires PostgreSQL: set TEST_ADMIN_DATABASE_URL"]
 async fn request_context_never_leaks_across_pooled_connections() {
-    let db = TestDb::create().await; // pool of exactly one connection => guaranteed reuse
+    let db = TestDb::create(1).await; // pool of exactly one connection => guaranteed reuse
     let a = register(&db.app, "a@a.test").await;
     let org_a = create_org(&db.app, a, "org-a").await;
 
@@ -105,7 +70,7 @@ async fn request_context_never_leaks_across_pooled_connections() {
 #[tokio::test]
 #[ignore = "requires PostgreSQL: set TEST_ADMIN_DATABASE_URL"]
 async fn app_role_cannot_bypass_rls_or_read_secrets() {
-    let db = TestDb::create().await;
+    let db = TestDb::create(1).await;
     let a = register(&db.app, "a@a.test").await;
     let mut tx = begin_tenant_tx(&db.app, TenantContext { user_id: Some(a), org_id: None }).await.unwrap();
     assert!(sqlx::query("select password_hash from users").fetch_all(&mut *tx).await.is_err(), "password_hash must not be selectable");

@@ -104,6 +104,9 @@ select pg_temp.ok('cannot update another user (0 rows)', pg_temp.affected(format
 select pg_temp.ok('user list is limited to self + active-org members', (select count(*) from users) = 3);
 
 -- ---------- 7. sessions ----------
+select pg_temp.as_ctx(null, null);
+select app.issue_email_token(:'alice', 'verify_email', decode(repeat('5a',32),'hex'), interval '1 hour');
+select app.verify_email(decode(repeat('5a',32),'hex'));
 select pg_temp.as_ctx(:'alice', :'org_a');
 insert into sessions (user_id, token_hash, expires_at) values (:'alice', decode(repeat('11',32),'hex'), now() + interval '1 day');
 select pg_temp.blocked('cannot create a session for another user', format($q$insert into sessions (user_id, token_hash, expires_at) values (%L, decode(repeat('22',32),'hex'), now()+interval '1 day')$q$, :'bob'));
@@ -111,5 +114,60 @@ select pg_temp.as_ctx(:'bob', :'org_b');
 select pg_temp.ok('B cannot see A''s sessions', (select count(*) from sessions) = 0);
 select pg_temp.ok('session resolves by token hash', (select count(*) from app.resolve_session(decode(repeat('11',32),'hex'))) = 1);
 select pg_temp.ok('unknown token resolves to nothing', (select count(*) from app.resolve_session(decode(repeat('99',32),'hex'))) = 0);
+
+
+-- ================= Milestone 2: tokens, lockout, MFA =================
+select pg_temp.as_ctx(null, null);
+select pg_temp.blocked('email_tokens is not directly readable', $q$select * from email_tokens$q$);
+select pg_temp.blocked('email_tokens cannot be written directly', $q$insert into email_tokens (user_id, purpose, token_hash, expires_at) values (gen_random_uuid(),'verify_email',decode(repeat('aa',32),'hex'),now())$q$);
+select pg_temp.blocked('consume_email_token is not callable by the app role', $q$select app.consume_email_token(decode(repeat('aa',32),'hex'),'reset_password')$q$);
+
+select app.register_user('erin@m2.test','Erin Token','$argon2id$old') as erin \gset
+select app.issue_email_token(:'erin', 'verify_email', decode(repeat('a1',32),'hex'), interval '1 hour');
+select pg_temp.ok('unverified user cannot resolve a session', (select count(*) from app.resolve_session(decode(repeat('a1',32),'hex'))) = 0);
+select pg_temp.ok('verify with wrong token fails', app.verify_email(decode(repeat('b2',32),'hex')) is null);
+select pg_temp.ok('verify with right token succeeds', app.verify_email(decode(repeat('a1',32),'hex')) = :'erin'::uuid);
+select pg_temp.ok('verification token is single-use', app.verify_email(decode(repeat('a1',32),'hex')) is null);
+
+-- expiry
+select app.issue_email_token(:'erin', 'reset_password', decode(repeat('c3',32),'hex'), interval '-1 minute');
+select pg_temp.ok('expired reset token is rejected', app.reset_password(decode(repeat('c3',32),'hex'), '$argon2id$new') is null);
+-- purpose confusion: a verify token cannot reset a password
+select app.issue_email_token(:'erin', 'verify_email', decode(repeat('d4',32),'hex'), interval '1 hour');
+select pg_temp.ok('verify token cannot be used as reset token', app.reset_password(decode(repeat('d4',32),'hex'), '$argon2id$evil') is null);
+-- re-issuing invalidates the previous link
+select app.issue_email_token(:'erin', 'reset_password', decode(repeat('e5',32),'hex'), interval '1 hour');
+select app.issue_email_token(:'erin', 'reset_password', decode(repeat('f6',32),'hex'), interval '1 hour');
+select pg_temp.ok('older reset link is invalidated by a newer one', app.reset_password(decode(repeat('e5',32),'hex'), '$argon2id$evil') is null);
+
+-- reset revokes every session
+select pg_temp.as_ctx(:'erin', null);
+insert into sessions (user_id, token_hash, expires_at) values (:'erin', decode(repeat('71',32),'hex'), now() + interval '1 day');
+select pg_temp.ok('session resolves before reset', (select count(*) from app.resolve_session(decode(repeat('71',32),'hex'))) = 1);
+select pg_temp.as_ctx(null, null);
+select pg_temp.ok('reset with valid token succeeds', app.reset_password(decode(repeat('f6',32),'hex'), '$argon2id$new') = :'erin'::uuid);
+select pg_temp.ok('password reset revoked all sessions', (select count(*) from app.resolve_session(decode(repeat('71',32),'hex'))) = 0);
+select pg_temp.ok('reset link is single-use', app.reset_password(decode(repeat('f6',32),'hex'), '$argon2id$again') is null);
+
+-- progressive lockout
+select pg_temp.ok('4 failures do not lock', (select count(*) from (select app.record_login_failure(:'erin', null) from generate_series(1,4)) x) = 4 and (select locked_until from app.find_user_for_login('erin@m2.test')) is null);
+select pg_temp.ok('5th failure locks the account', app.record_login_failure(:'erin', null) > now());
+select pg_temp.ok('lock grows with further failures', app.record_login_failure(:'erin', null) > now() + interval '90 seconds');
+select app.record_login_success(:'erin', null);
+select pg_temp.ok('success clears counter and lock', (select failed_login_count = 0 and locked_until is null from app.find_user_for_login('erin@m2.test')));
+
+-- MFA isolation
+select app.register_user('frank@m2.test','Frank Other','$argon2id$x') as frank \gset
+select pg_temp.as_ctx(:'erin', null);
+insert into user_mfa (user_id, secret_enc) values (:'erin', '\x0102'::bytea);
+insert into mfa_recovery_codes (user_id, code_hash) values (:'erin', decode(repeat('99',32),'hex'));
+select pg_temp.as_ctx(:'frank', null);
+select pg_temp.ok('other users cannot read MFA secrets', (select count(*) from user_mfa) = 0);
+select pg_temp.ok('other users cannot read recovery codes', (select count(*) from mfa_recovery_codes) = 0);
+select pg_temp.blocked('cannot plant MFA secret for another user', format($q$insert into user_mfa (user_id, secret_enc) values (%L, '\x01'::bytea)$q$, :'erin'));
+select pg_temp.ok('cannot burn another user''s recovery code (0 rows)', pg_temp.affected(format($q$update mfa_recovery_codes set used_at = now() where user_id = %L$q$, :'erin')) = 0);
+select pg_temp.blocked('cannot flip mfa_enabled directly', format($q$update users set mfa_enabled = false where id = %L$q$, :'frank'));
+select pg_temp.as_ctx(null, null);
+select pg_temp.blocked('set_mfa_enabled requires authentication', $q$select app.set_mfa_enabled(true)$q$);
 
 \echo ALL RLS ATTACK TESTS PASSED

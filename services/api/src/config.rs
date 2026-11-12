@@ -1,3 +1,5 @@
+use base64::{Engine, engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}};
+use sha2::{Digest, Sha256};
 use std::{fmt, net::SocketAddr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,9 +25,25 @@ pub struct Config {
     pub database_url: String,
     pub migrator_database_url: Option<String>,
     pub redis_url: String,
+    /// Public origin of the web app (used in email links).
+    pub public_url: String,
+    /// Origins allowed to make state-changing requests (CSRF Origin check).
+    pub allowed_origins: Vec<String>,
+    /// Derived 256-bit key for CSRF tokens.
+    pub csrf_key: [u8; 32],
+    /// 256-bit key encrypting MFA secrets at rest.
+    pub mfa_key: [u8; 32],
+    /// Number of trusted reverse-proxy hops in X-Forwarded-For (0 = use the socket address).
+    pub trusted_proxy_hops: usize,
+    pub smtp_url: Option<String>,
+    pub mail_from: String,
 }
 
 impl Config {
+    pub fn cookie_secure(&self) -> bool {
+        self.environment != Environment::Development
+    }
+
     pub fn from_env() -> Result<Self, ConfigError> {
         Self::from_lookup(|k| std::env::var(k).ok())
     }
@@ -39,7 +57,25 @@ impl Config {
             _ => return Err(ConfigError::Invalid("APP_ENV")),
         };
         let bind = get("API_BIND").unwrap_or_else(|| "127.0.0.1:8080".into()).parse().map_err(|_| ConfigError::Invalid("API_BIND"))?;
+        let csrf_secret = req("CSRF_SECRET")?;
+        if csrf_secret.len() < 32 {
+            return Err(ConfigError::Invalid("CSRF_SECRET"));
+        }
+        let csrf_key: [u8; 32] = Sha256::digest(csrf_secret.as_bytes()).into();
+        let mfa_raw = req("MFA_ENCRYPTION_KEY")?;
+        let mfa_bytes = STANDARD.decode(mfa_raw.trim()).or_else(|_| URL_SAFE_NO_PAD.decode(mfa_raw.trim())).map_err(|_| ConfigError::Invalid("MFA_ENCRYPTION_KEY"))?;
+        let mfa_key: [u8; 32] = mfa_bytes.try_into().map_err(|_| ConfigError::Invalid("MFA_ENCRYPTION_KEY"))?;
+        let public_url = get("PUBLIC_URL").unwrap_or_else(|| "http://localhost:3000".into()).trim_end_matches('/').to_owned();
+        let allowed_origins = get("ALLOWED_ORIGINS").map(|v| v.split(',').map(|o| o.trim().trim_end_matches('/').to_owned()).filter(|o| !o.is_empty()).collect()).unwrap_or_else(|| vec![public_url.clone()]);
+        let trusted_proxy_hops = get("TRUSTED_PROXY_HOPS").map(|v| v.parse().map_err(|_| ConfigError::Invalid("TRUSTED_PROXY_HOPS"))).transpose()?.unwrap_or(0);
         Ok(Self {
+            public_url,
+            allowed_origins,
+            csrf_key,
+            mfa_key,
+            trusted_proxy_hops,
+            smtp_url: get("SMTP_URL").filter(|v| !v.trim().is_empty()),
+            mail_from: get("MAIL_FROM").unwrap_or_else(|| "PERMTPA ONE <no-reply@localhost>".into()),
             bind,
             environment,
             database_url: req("DATABASE_URL")?,
@@ -58,6 +94,11 @@ impl fmt::Debug for Config {
             .field("database_url", &"<redacted>")
             .field("migrator_database_url", &self.migrator_database_url.as_ref().map(|_| "<redacted>"))
             .field("redis_url", &"<redacted>")
+            .field("public_url", &self.public_url)
+            .field("allowed_origins", &self.allowed_origins)
+            .field("csrf_key", &"<redacted>")
+            .field("mfa_key", &"<redacted>")
+            .field("smtp_url", &self.smtp_url.as_ref().map(|_| "<redacted>"))
             .finish()
     }
 }
@@ -73,14 +114,33 @@ mod tests {
     }
 
     #[test]
-    fn requires_database_and_redis() {
+    fn requires_database_redis_and_secrets() {
         assert_eq!(Config::from_lookup(env(&[])).unwrap_err(), ConfigError::Missing("DATABASE_URL"));
         assert_eq!(Config::from_lookup(env(&[("DATABASE_URL", "postgres://x")])).unwrap_err(), ConfigError::Missing("REDIS_URL"));
+        assert_eq!(Config::from_lookup(env(&[("DATABASE_URL", "x"), ("REDIS_URL", "y")])).unwrap_err(), ConfigError::Missing("CSRF_SECRET"));
+    }
+
+    const GOOD: [(&str, &str); 4] = [("DATABASE_URL", "postgres://x"), ("REDIS_URL", "redis://x"), ("CSRF_SECRET", "0123456789abcdef0123456789abcdef"), ("MFA_ENCRYPTION_KEY", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")];
+
+    #[test]
+    fn rejects_weak_or_malformed_secrets() {
+        let with = |k: &str, v: &str| { let mut e: Vec<(&str, &str)> = GOOD.iter().filter(|(x, _)| *x != k).cloned().collect(); e.push((k, v)); e };
+        assert_eq!(Config::from_lookup(env(&with("CSRF_SECRET", "short"))).unwrap_err(), ConfigError::Invalid("CSRF_SECRET"));
+        assert_eq!(Config::from_lookup(env(&with("MFA_ENCRYPTION_KEY", "AAAA"))).unwrap_err(), ConfigError::Invalid("MFA_ENCRYPTION_KEY"));
+        assert!(Config::from_lookup(env(&GOOD)).is_ok());
+    }
+
+    #[test]
+    fn cookies_are_secure_outside_development() {
+        let mut e = GOOD.to_vec();
+        assert!(!Config::from_lookup(env(&e)).unwrap().cookie_secure());
+        e.push(("APP_ENV", "production"));
+        assert!(Config::from_lookup(env(&e)).unwrap().cookie_secure());
     }
 
     #[test]
     fn rejects_bad_values() {
-        let base = [("DATABASE_URL", "postgres://x"), ("REDIS_URL", "redis://x")];
+        let base = GOOD;
         let mut bad_env = base.to_vec();
         bad_env.push(("APP_ENV", "prod-ish"));
         assert_eq!(Config::from_lookup(env(&bad_env)).unwrap_err(), ConfigError::Invalid("APP_ENV"));
@@ -91,8 +151,8 @@ mod tests {
 
     #[test]
     fn debug_output_never_contains_secrets() {
-        let c = Config::from_lookup(env(&[("DATABASE_URL", "postgres://u:supersecret@h/db"), ("REDIS_URL", "redis://:hunter2@h")])).unwrap();
+        let c = Config::from_lookup(env(&[("DATABASE_URL", "postgres://u:supersecret@h/db"), ("REDIS_URL", "redis://:hunter2@h"), ("CSRF_SECRET", "0123456789abcdef0123456789abcdef"), ("MFA_ENCRYPTION_KEY", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="), ("SMTP_URL", "smtp://u:smtppw@h")])).unwrap();
         let shown = format!("{c:?}");
-        assert!(!shown.contains("supersecret") && !shown.contains("hunter2"));
+        for secret in ["supersecret", "hunter2", "smtppw", "0123456789abcdef", "AAECAwQF"] { assert!(!shown.contains(secret), "leaked {secret}"); }
     }
 }

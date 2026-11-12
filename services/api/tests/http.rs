@@ -1,6 +1,7 @@
 use axum::{body::Body, http::{Request, StatusCode}};
 use http_body_util::BodyExt;
-use permtpa_api::app::{AppState, router};
+mod common;
+use permtpa_api::{app::{AppState, router}, mailer::Mailer};
 use sqlx::postgres::PgPoolOptions;
 use std::{sync::Arc, time::Duration};
 use tower::ServiceExt;
@@ -9,7 +10,7 @@ use tower::ServiceExt;
 /// and readiness fails closed without leaking connection details.
 fn dead_state() -> AppState {
     let pool = PgPoolOptions::new().acquire_timeout(Duration::from_millis(300)).connect_lazy("postgres://u:topsecretpw@127.0.0.1:1/db").unwrap();
-    AppState { pool, redis: Arc::new(redis::Client::open("redis://:redispw@127.0.0.1:1").unwrap()) }
+    AppState::new(pool, Arc::new(redis::Client::open("redis://:redispw@127.0.0.1:1").unwrap()), common::test_config("development"), Mailer::capture())
 }
 
 async fn get(path: &str) -> (StatusCode, axum::http::HeaderMap, String) {
@@ -51,8 +52,8 @@ async fn unknown_routes_are_404() {
 
 #[tokio::test]
 async fn oversized_bodies_are_rejected() {
-    let big = vec![b'x'; 2 * 1024 * 1024];
-    let res = router(dead_state()).oneshot(Request::post("/healthz").body(Body::from(big)).unwrap()).await.unwrap();
-    // Method not allowed or payload too large — in either case never 200.
-    assert_ne!(res.status(), StatusCode::OK);
+    let big = vec![b'x'; 200 * 1024];
+    let req = Request::post("/v1/auth/login").header("origin", common::ORIGIN).header("content-type", "application/json").header("content-length", big.len().to_string()).body(Body::from(big)).unwrap();
+    let res = router(dead_state()).oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }
