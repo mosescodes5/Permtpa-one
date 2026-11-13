@@ -29,7 +29,8 @@ export default defineConfig({
   timeout: 45_000,
   use: { baseURL: WEB, trace: "retain-on-failure" },
   webServer: [
-    { command: "../../target/debug/permtpa-api", url: `${API}/healthz`, env: apiEnv, reuseExistingServer: false, timeout: 60_000 },
+    // `cargo run` works on every OS (no path separators, no .exe) and builds the API first if needed.
+    { command: "cargo run -p permtpa-api", cwd: "../..", url: `${API}/healthz`, env: apiEnv, reuseExistingServer: false, timeout: 600_000 },
     { command: "npm run build && npx next start -p 3100", url: WEB, env: { API_INTERNAL_URL: API }, reuseExistingServer: false, timeout: 240_000 },
   ],
   projects: [

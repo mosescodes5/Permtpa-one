@@ -14,7 +14,7 @@ begin
   begin
     execute stmt;
     allowed := true;   -- only reached if NOTHING rejected the statement
-  exception when sqlstate '42501' or sqlstate '23514' or sqlstate 'P0001' then
+  exception when sqlstate '42501' or sqlstate '23514' or sqlstate '23505' or sqlstate 'P0001' then
     null;              -- rejected by RLS / privilege / CHECK / trigger: expected
   end;
   -- Raised OUTSIDE the protected block so the handler above can never swallow it.
@@ -174,5 +174,55 @@ select pg_temp.ok('cannot burn another user''s recovery code (0 rows)', pg_temp.
 select pg_temp.blocked('cannot flip mfa_enabled directly', format($q$update users set mfa_enabled = false where id = %L$q$, :'frank'));
 select pg_temp.as_ctx(null, null);
 select pg_temp.blocked('set_mfa_enabled requires authentication', $q$select app.set_mfa_enabled(true)$q$);
+
+
+-- ================= Milestone 3A: invitations + audit triggers =================
+select app.register_user('gina@m3.test','Gina Invitee','$argon2id$x') as gina \gset
+select app.register_user('hank@m3.test','Hank Other','$argon2id$x') as hank \gset
+select app.issue_email_token(:'gina','verify_email',decode(repeat('c1',32),'hex'),interval '1 hour'); select app.verify_email(decode(repeat('c1',32),'hex'));
+select app.issue_email_token(:'hank','verify_email',decode(repeat('c2',32),'hex'),interval '1 hour'); select app.verify_email(decode(repeat('c2',32),'hex'));
+
+select pg_temp.as_ctx(:'alice', :'org_a');
+insert into invitations (org_id, email, role, token_hash, invited_by, expires_at) values (:'org_a','gina@m3.test','manager', decode(repeat('d1',32),'hex'), :'alice', now() + interval '1 day');
+select pg_temp.blocked('only one pending invitation per email', format($q$insert into invitations (org_id, email, role, token_hash, invited_by, expires_at) values (%L,'gina@m3.test','read_only', decode(repeat('d2',32),'hex'), %L, now()+interval '1 day')$q$, :'org_a', :'alice'));
+select pg_temp.ok('invitation creation is audited with the real actor', (select count(*) from audit_logs where org_id = :'org_a' and action = 'invitation.create' and actor_user_id = :'alice') = 1);
+
+select pg_temp.as_ctx(:'hank', null);
+select pg_temp.ok('a different user cannot redeem the invitation', app.accept_invitation(decode(repeat('d1',32),'hex')) is null);
+select pg_temp.ok('a bad token redeems nothing', app.accept_invitation(decode(repeat('ff',32),'hex')) is null);
+select pg_temp.as_ctx(null, null);
+select pg_temp.blocked('accepting requires authentication', $q$select app.accept_invitation(decode(repeat('d1',32),'hex'))$q$);
+
+select pg_temp.as_ctx(:'gina', null);
+select pg_temp.ok('the invited user can accept', app.accept_invitation(decode(repeat('d1',32),'hex')) = :'org_a'::uuid);
+select pg_temp.ok('accepting grants exactly the invited role', (select role from memberships where org_id = :'org_a' and user_id = :'gina') = 'manager');
+select pg_temp.ok('an invitation is single-use', app.accept_invitation(decode(repeat('d1',32),'hex')) is null);
+select pg_temp.as_ctx(:'alice', :'org_a');
+select pg_temp.ok('acceptance and member.add are audited', (select count(*) from audit_logs where org_id = :'org_a' and action in ('invitation.accepted','member.add') and target_id = :'gina') = 2);
+
+-- expired / revoked invitations
+select pg_temp.as_ctx(:'alice', :'org_a');
+insert into invitations (org_id, email, role, token_hash, invited_by, expires_at) values (:'org_a','hank@m3.test','read_only', decode(repeat('d3',32),'hex'), :'alice', now() - interval '1 minute');
+select pg_temp.as_ctx(:'hank', null);
+select pg_temp.ok('an expired invitation cannot be accepted', app.accept_invitation(decode(repeat('d3',32),'hex')) is null);
+select pg_temp.as_ctx(:'alice', :'org_a');
+insert into invitations (org_id, email, role, token_hash, invited_by, expires_at) select :'org_a','hank@m3.test','sales_staff', decode(repeat('d4',32),'hex'), :'alice', now() + interval '1 day' where false;
+update invitations set revoked_at = now() where token_hash = decode(repeat('d3',32),'hex');
+insert into invitations (org_id, email, role, token_hash, invited_by, expires_at) values (:'org_a','hank@m3.test','sales_staff', decode(repeat('d5',32),'hex'), :'alice', now() + interval '1 day');
+update invitations set revoked_at = now() where token_hash = decode(repeat('d5',32),'hex');
+select pg_temp.as_ctx(:'hank', null);
+select pg_temp.ok('a revoked invitation cannot be accepted', app.accept_invitation(decode(repeat('d5',32),'hex')) is null);
+select pg_temp.as_ctx(:'alice', :'org_a');
+select pg_temp.ok('revocation is audited', (select count(*) from audit_logs where org_id = :'org_a' and action = 'invitation.revoke') >= 1);
+
+-- role changes / removals are audited and hidden from non-admins
+select pg_temp.as_ctx(:'alice', :'org_a');
+update memberships set role = 'accountant' where user_id = :'gina';
+select pg_temp.ok('role change is audited with before/after', (select (metadata->>'from_role') = 'manager' and (metadata->>'to_role') = 'accountant' from audit_logs where org_id = :'org_a' and action = 'member.role_change' and target_id = :'gina'));
+delete from memberships where user_id = :'gina';
+select pg_temp.ok('member removal is audited', (select count(*) from audit_logs where org_id = :'org_a' and action = 'member.remove' and target_id = :'gina') = 1);
+select pg_temp.as_ctx(:'carol', :'org_a');
+select pg_temp.ok('non-admins cannot read the audit trail', (select count(*) from audit_logs) = 0);
+select pg_temp.blocked('audit rows cannot be forged by members', format($q$insert into audit_logs (org_id, actor_user_id, action) values (%L, %L, 'member.add')$q$, :'org_a', :'alice'));
 
 \echo ALL RLS ATTACK TESTS PASSED

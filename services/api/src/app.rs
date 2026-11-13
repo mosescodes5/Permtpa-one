@@ -1,5 +1,5 @@
 use crate::{config::{Config, Environment}, mailer::Mailer, security, session};
-use axum::{Json, Router, extract::State, http::{HeaderName, HeaderValue, StatusCode}, middleware, routing::{delete, get, post}};
+use axum::{Json, Router, extract::State, http::{HeaderName, HeaderValue, StatusCode}, middleware, routing::{delete, get, patch, post}};
 use serde_json::{Value, json};
 use sqlx::PgPool;
 use std::{sync::Arc, time::Duration};
@@ -49,7 +49,12 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/auth/mfa/disable", post(crate::mfa::disable))
         .route("/v1/me", get(crate::auth::me))
         .route("/v1/organizations", post(crate::orgs::create))
-        .route("/v1/orgs/{org_id}/members", get(crate::orgs::members));
+        .route("/v1/orgs/{org_id}", get(crate::team::org_get).patch(crate::team::org_update))
+        .route("/v1/orgs/{org_id}/members", get(crate::orgs::members))
+        .route("/v1/orgs/{org_id}/members/{user_id}", patch(crate::team::member_update).delete(crate::team::member_remove))
+        .route("/v1/orgs/{org_id}/invitations", get(crate::team::list_invitations).post(crate::team::invite))
+        .route("/v1/orgs/{org_id}/invitations/{id}", delete(crate::team::revoke_invitation))
+        .route("/v1/invitations/accept", post(crate::team::accept_invitation));
     // The development outbox exists ONLY in development (404 everywhere else — see tests).
     if state.cfg.environment == Environment::Development {
         v1 = v1.route("/v1/dev/outbox", get(dev_outbox));

@@ -10,4 +10,5 @@ pub mod orgs;
 pub mod ratelimit;
 pub mod security;
 pub mod session;
+pub mod team;
 pub mod validate;
