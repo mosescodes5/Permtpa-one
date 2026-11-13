@@ -25,11 +25,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = db::connect(&cfg.database_url, 10).await?;
     let redis = Arc::new(redis::Client::open(cfg.redis_url.as_str())?);
-    // Development captures mail in memory (readable at /v1/dev/outbox). No SMTP transport is wired yet, so every
-    // other environment refuses to send rather than pretending to — see PROGRESS.md "Known issues".
-    let mailer = if cfg.environment == Environment::Development { Mailer::capture() } else { Mailer::Disabled };
+    // SMTP when configured; otherwise development captures mail in memory (readable at /v1/dev/outbox) and every
+    // other environment refuses to send rather than pretending to.
+    let mailer = match (&cfg.smtp_url, cfg.environment) {
+        (Some(url), _) => Mailer::smtp(url, &cfg.mail_from)?,
+        (None, Environment::Development) => Mailer::capture(),
+        (None, _) => Mailer::Disabled,
+    };
     if matches!(mailer, Mailer::Disabled) {
-        tracing::warn!("no mail transport configured: verification and reset emails will NOT be delivered");
+        tracing::warn!("SMTP_URL is not set: verification and reset emails will NOT be delivered");
     }
     let state = app::AppState::new(pool, redis, cfg.clone(), mailer);
     let app = app::router(state);

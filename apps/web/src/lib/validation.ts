@@ -5,12 +5,11 @@ export const emailSchema = z.string().trim().min(1, "Enter your email address").
 /** Length-first policy (NIST 800-63B style): long passphrases, no arbitrary composition rules. */
 export const passwordSchema = z.string().min(12, "Use at least 12 characters").max(128, "Use at most 128 characters");
 
-export const loginSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password") });
+export const loginSchema = z.object({ email: emailSchema, password: z.string().min(1, "Enter your password"), mfaCode: z.string().trim().max(32).optional() });
 
 export const registerSchema = z
   .object({
     fullName: z.string().trim().min(2, "Enter your full name").max(100),
-    businessName: z.string().trim().min(2, "Enter your business name").max(120),
     email: emailSchema,
     password: passwordSchema,
     acceptTerms: z.boolean().refine((v) => v, "You must accept the terms to continue"),
@@ -33,3 +32,9 @@ export function passwordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
   if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
   return Math.min(score, 4) as 0 | 1 | 2 | 3 | 4;
 }
+
+export const resetSchema = z.object({ newPassword: passwordSchema, confirm: z.string() }).refine((v) => v.newPassword === v.confirm, { message: "Passwords do not match", path: ["confirm"] });
+export type ResetInput = z.infer<typeof resetSchema>;
+
+export const onboardingSchema = z.object({ name: z.string().trim().min(2, "Enter your business name").max(120), businessType: z.string().min(1, "Choose a business type") });
+export type OnboardingInput = z.infer<typeof onboardingSchema>;

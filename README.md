@@ -3,7 +3,7 @@
 **One business. One platform. Total control.**
 PERMTPA ONE is a business operating system — a technology product by PERMTPA.
 
-Status: **Milestone 1 complete** (see [PROGRESS.md](PROGRESS.md)). Not yet production-ready: authentication, products, sales, billing etc. arrive in Milestones 2–8.
+Status: **Milestones 1–2 complete** (see [PROGRESS.md](PROGRESS.md)). Not yet production-ready: products, sales, billing etc. arrive in Milestones 3–8.
 
 ## Layout
 | Path | Purpose |

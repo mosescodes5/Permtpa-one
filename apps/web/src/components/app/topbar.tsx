@@ -1,36 +1,39 @@
 "use client";
 import Link from "next/link";
 import { AlertTriangle, Bell, Check, ChevronsUpDown, LogOut, Menu, Search, Settings, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
 import { Popover } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-/** Sample organizations/user. Real memberships come from the server in Milestone 2/3. */
-const ORGS = [{ name: "Okafor & Sons Trading", role: "Owner", current: true }, { name: "Greenfield Farms", role: "Manager", current: false }];
+const roleLabel = (r: string) => r.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 
 export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () => void }) {
+  const { me, activeOrg, setActiveOrg, logout } = useAuth();
+  const orgName = activeOrg?.name ?? "Workspace";
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-bg/85 px-4 backdrop-blur-md sm:px-6">
       <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation" onClick={onMenu}><Menu /></Button>
 
       <Popover align="left" trigger={({ toggle, props }) => (
         <button type="button" onClick={toggle} {...props} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border-strong bg-surface px-2.5 py-1.5 text-left shadow-sm hover:bg-bg-subtle">
-          <span className="flex size-7 items-center justify-center rounded-md bg-navy text-xs font-semibold text-[#f4f1ea]">O</span>
-          <span className="hidden sm:block"><span className="block text-sm font-medium leading-tight">Okafor &amp; Sons Trading</span><span className="block text-[11px] leading-tight text-subtle">Owner</span></span>
+          <span className="flex size-7 items-center justify-center rounded-md bg-navy text-xs font-semibold text-[#f4f1ea]">{orgName[0]?.toUpperCase()}</span>
+          <span className="hidden sm:block"><span data-testid="active-org" className="block text-sm font-medium leading-tight">{orgName}</span><span className="block text-[11px] leading-tight text-subtle">{roleLabel(activeOrg?.role ?? "")}</span></span>
           <ChevronsUpDown className="size-3.5 text-subtle" />
         </button>
       )}>
         {(close) => (<>
           <p className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-subtle">Organizations</p>
-          {ORGS.map((o) => (
-            <button key={o.name} role="menuitem" type="button" onClick={close} className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-bg-subtle">
-              <span className="flex size-7 items-center justify-center rounded-md bg-bg-subtle text-xs font-semibold">{o.name[0]}</span>
-              <span className="flex-1"><span className="block">{o.name}</span><span className="block text-[11px] text-subtle">{o.role}</span></span>
-              {o.current && <Check className="size-4 text-accent" />}
+          {(me?.memberships ?? []).map((o) => (
+            <button key={o.orgId} role="menuitem" type="button" onClick={() => { setActiveOrg(o.orgId); close(); }} className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-bg-subtle">
+              <span className="flex size-7 items-center justify-center rounded-md bg-bg-subtle text-xs font-semibold">{o.name[0]?.toUpperCase()}</span>
+              <span className="flex-1"><span className="block">{o.name}</span><span className="block text-[11px] text-subtle">{roleLabel(o.role)}</span></span>
+              {o.orgId === activeOrg?.orgId && <Check className="size-4 text-accent" />}
             </button>
           ))}
-          <p className="border-t border-border px-2.5 pb-1 pt-2 text-[11px] text-subtle">Sample data. Switching is enabled with the tenancy API.</p>
+          <p className="border-t border-border px-2.5 pb-1 pt-2 text-[11px] text-subtle">Access to each organization is verified by the server.</p>
         </>)}
       </Popover>
 
@@ -54,13 +57,13 @@ export function Topbar({ onMenu, onSearch }: { onMenu: () => void; onSearch: () 
           </div>)}
         </Popover>
         <Popover trigger={({ toggle, props }) => (
-          <button type="button" onClick={toggle} {...props} aria-label="Account menu" className="ml-1 flex size-9 cursor-pointer items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent ring-1 ring-border-strong">AO</button>
+          <button type="button" onClick={toggle} {...props} aria-label="Account menu" className="ml-1 flex size-9 cursor-pointer items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent ring-1 ring-border-strong">{initials(me?.user.fullName ?? "")}</button>
         )}>
           {(close) => (<>
-            <div className="px-2.5 py-2"><p className="text-sm font-medium">Adaeze Okafor</p><p className="text-xs text-subtle">adaeze@example.com</p></div>
+            <div className="px-2.5 py-2"><p className="text-sm font-medium">{me?.user.fullName}</p><p className="text-xs text-subtle">{me?.user.email}</p></div>
             <div className="my-1 h-px bg-border" />
             <Link role="menuitem" href="/settings" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm hover:bg-bg-subtle"><Settings className="size-4 text-muted" />Settings</Link>
-            <Link role="menuitem" href="/login" onClick={close} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm hover:bg-bg-subtle"><LogOut className="size-4 text-muted" />Log out</Link>
+            <button role="menuitem" type="button" onClick={() => { close(); void logout(); }} className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-bg-subtle"><LogOut className="size-4 text-muted" />Log out</button>
           </>)}
         </Popover>
       </div>

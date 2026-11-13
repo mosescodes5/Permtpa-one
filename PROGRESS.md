@@ -2,6 +2,52 @@
 
 _Every result below was produced by actually running the command in the build sandbox (Ubuntu 24.04). Nothing here was run in Docker — see Known issues._
 
+## Milestone 2 — Authentication, sessions, MFA, tenancy wiring: **COMPLETE (verified in sandbox)**
+
+### Delivered
+- **API** (`/v1`): register, verify-email, resend-verification, login (+ optional `mfaCode`), logout, forgot/reset-password, csrf, `me`, session list / revoke / revoke-others, MFA setup / enable / disable, create organization, list org members (role-aware: only Owner/Admin see emails). RFC 9457 problem+json errors.
+- **Security**: Argon2id; opaque hashed session tokens in HttpOnly cookies with rotation, idle + absolute expiry; Origin + session-bound CSRF; Redis rate limits (fail-closed) + progressive lockout; enumeration-safe responses; single-use purpose-bound email tokens; TOTP with replay protection + hashed single-use recovery codes; AES-256-GCM for MFA secrets; `deny_unknown_fields` everywhere; SMTP transport with TLS enforced outside development; trusted-proxy-aware client IP.
+- **Database**: migrations 0005 (tokens, lockout accounting, verified-only session resolution) and 0006 (MFA). Audit events for register / verify / login / failed login / reset / MFA.
+- **Web**: forms wired to the real API (no placeholders), open-redirect-safe `?next=`, verify-email, reset-password, onboarding (create workspace), real user/org in the shell, working logout, org switcher from real memberships, Settings page (profile, MFA with QR + recovery codes, session management), same-origin `/api` proxy.
+
+### Verification results (final fresh run, M2)
+| Check | Result |
+|---|---|
+| ESLint / tsc strict | 0 problems / clean |
+| Vitest | 4 files, **31 passed** |
+| `cargo test --workspace` (non-DB) | **27 passed** (18 DB/SMTP-backed tests marked ignored, run below) |
+| HTTP auth integration suite (real PG + Redis, `--ignored`) | **13 passed** (stable over 3 runs at 6-way parallelism) |
+| Tenancy via Rust path | **3 passed** |
+| SMTP delivery to a real local SMTP server | **2 passed** (delivery with intact link; CRLF header injection refused) |
+| SQL adversarial RLS/auth suite | **67 passed, 0 failed** |
+| Full-stack Playwright (Next → Rust API → PG + Redis; desktop + mobile Chromium) | **19 passed, 1 skipped** (MFA flow is desktop-only by design) |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Mutation testing — Rust security controls | **12/12 detected** (CSRF token, Origin, lockout, TOTP replay*, recovery-code burn, IDOR 404, rate limit, session rotation, mass assignment, reset-revokes-sessions, dev outbox in prod, enumeration) |
+| Mutation testing — SQL | **7/7 detected** after fixing one vacuous test (see below) |
+\* TOTP replay is enforced in two layers; removing one is an equivalent mutant, removing both is detected.
+
+### Defects found and fixed during M2 (for honesty)
+1. **Real bug (caught by unit test):** `loginSchema` did not declare `mfaCode`; Zod stripped it, so MFA users could never log in via the UI. Fixed.
+2. **Real UX bug (caught by e2e):** after explicit logout the auth gate raced the redirect and produced `/login?next=/dashboard`. Fixed.
+3. **Vacuous test (caught by mutation testing):** the SQL "unverified user cannot resolve a session" assertion looked up an email-token hash, not a session, and could never fail. Rewritten with a real session; mutant now detected.
+4. Test-harness races (parallel `ALTER ROLE`) serialised; stale fixtures and a convoluted selector fixed.
+5. Config validation order made deterministic (DB/Redis URLs before secrets).
+
+### Known issues / not verified (M2)
+- **Docker still not run** (unavailable in sandbox). `clippy`, `rustfmt --check`, `cargo audit`, `cargo deny` not run (components unavailable); wired into CI.
+- **SMTP verified only against a plaintext local sink.** TLS delivery to a real provider is untested. Without `SMTP_URL`, non-development environments refuse to send (loudly) rather than pretend.
+- Argon2 parameters are library defaults, not benchmarked for production hardware. No breached-password corpus check; no CAPTCHA.
+- Not implemented yet: logged-in password change, email change, recovery-code regeneration, account deletion, invitations (M3).
+- UI route guard is client-side UX only; real enforcement is in the API/DB. Web CSP is not yet enforced (M8).
+- Redis connections are opened per rate-limit call (correct but not optimised).
+- `TRUSTED_PROXY_HOPS` must match deployment topology; e2e deliberately uses 2 so tests can present unique client IPs.
+- E2E in the sandbox uses an npm-distributed Chromium via `PW_CHROMIUM_PATH`; CI uses the standard Playwright browsers.
+
+### Next: Milestone 3 (not started)
+Organization management (profile, invitations → accept flow, role assignment UI, member management), products / categories / variants / SKUs / barcodes, stock movements and adjustments, reorder thresholds, inventory valuation. Each new tenant table gets `org_id` + RLS + attack tests from day one.
+
+---
+
 ## Milestone 1 — Foundation: **COMPLETE (verified in sandbox)**
 
 ### Delivered
@@ -44,5 +90,3 @@ _Every result below was produced by actually running the command in the build sa
 - No visual regression tests; layout was reviewed manually via screenshots (landing light, dashboard dark, mobile).
 - Legal pages need counsel review.
 
-### Next: Milestone 2 (not started)
-Rust auth (Argon2id, cookie sessions + rotation, CSRF, rate limiting, email verification/reset, MFA + recovery codes, session list/revocation), permission matrix, wire the existing forms and shell to the API, extend the attack suite with auth-abuse tests.

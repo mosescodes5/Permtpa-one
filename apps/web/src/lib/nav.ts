@@ -15,7 +15,7 @@ export const NAV: NavItem[] = [
   { slug: "team", label: "Team", href: "/team", icon: UserCog, section: "Admin", milestone: 3, blurb: "Employees, roles, shifts and attendance." },
   { slug: "audit-log", label: "Audit log", href: "/audit-log", icon: History, section: "Admin", milestone: 5, blurb: "A tamper-resistant record of sensitive actions." },
   { slug: "organization", label: "Organization", href: "/organization", icon: Building2, section: "Admin", milestone: 3, blurb: "Business profile, locations and billing." },
-  { slug: "settings", label: "Settings", href: "/settings", icon: Settings, section: "Admin", milestone: 2, blurb: "Profile, security, sessions and preferences." },
+  { slug: "settings", label: "Settings", href: "/settings", icon: Settings, section: "Admin", milestone: 2, blurb: "Profile, security, sessions and two-factor authentication." },
 ];
 
 export const NAV_SECTIONS = ["Operate", "Grow", "Admin"] as const;

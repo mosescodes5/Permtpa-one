@@ -15,6 +15,7 @@ axum = "0.8.9"
 base64 = "0.23.1"
 getrandom = "0.4.3"
 hmac = "0.13.0"
+lettre = { version = "0.11.23", default-features = false, features = ["aws-lc-rs", "builder", "rustls-native-certs", "smtp-transport", "tokio1", "tokio1-rustls", "tokio1-rustls-tls"] }
 permtpa-domain = { path = "../../crates/domain" }
 redis = { version = "1.8.1", default-features = false, features = ["tokio-comp"] }
 serde = { version = "1.0.229", features = ["derive"] }

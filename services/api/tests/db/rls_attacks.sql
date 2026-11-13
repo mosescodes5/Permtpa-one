@@ -124,9 +124,14 @@ select pg_temp.blocked('consume_email_token is not callable by the app role', $q
 
 select app.register_user('erin@m2.test','Erin Token','$argon2id$old') as erin \gset
 select app.issue_email_token(:'erin', 'verify_email', decode(repeat('a1',32),'hex'), interval '1 hour');
-select pg_temp.ok('unverified user cannot resolve a session', (select count(*) from app.resolve_session(decode(repeat('a1',32),'hex'))) = 0);
+-- a session row that exists for a still-unverified user must be unusable
+select pg_temp.as_ctx(:'erin', null);
+insert into sessions (user_id, token_hash, expires_at) values (:'erin', decode(repeat('81',32),'hex'), now() + interval '1 day');
+select pg_temp.as_ctx(null, null);
+select pg_temp.ok('unverified user cannot resolve a session', (select count(*) from app.resolve_session(decode(repeat('81',32),'hex'))) = 0);
 select pg_temp.ok('verify with wrong token fails', app.verify_email(decode(repeat('b2',32),'hex')) is null);
 select pg_temp.ok('verify with right token succeeds', app.verify_email(decode(repeat('a1',32),'hex')) = :'erin'::uuid);
+select pg_temp.ok('the same session works once the email is verified', (select count(*) from app.resolve_session(decode(repeat('81',32),'hex'))) = 1);
 select pg_temp.ok('verification token is single-use', app.verify_email(decode(repeat('a1',32),'hex')) is null);
 
 -- expiry

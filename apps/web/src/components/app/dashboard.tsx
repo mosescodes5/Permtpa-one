@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { LOW_STOCK, RECENT, REVENUE_SERIES, TOP_PRODUCTS, sumSeries, type Range } from "@/lib/sample-data";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/auth/auth-provider";
 
 const RANGES: { id: Range; label: string }[] = [{ id: "7d", label: "7 days" }, { id: "30d", label: "30 days" }, { id: "90d", label: "90 days" }];
 const STATUS = { paid: { tone: "accent", label: "Paid" }, owing: { tone: "warning", label: "Owing" }, refunded: { tone: "danger", label: "Refunded" } } as const;
@@ -25,6 +26,7 @@ function Kpi({ label, value, delta, up, note }: { label: string; value: string; 
 }
 
 export function Dashboard() {
+  const { me, activeOrg } = useAuth();
   const [range, setRange] = useState<Range>("30d");
   const data = REVENUE_SERIES[range];
   const totals = useMemo(() => sumSeries(range), [range]);
@@ -34,7 +36,7 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><h1 className="font-display text-4xl">Good morning, Adaeze</h1><p className="mt-1 text-sm text-muted">Here&apos;s how Okafor &amp; Sons Trading is performing.</p></div>
+        <div><h1 className="font-display text-4xl">Good morning, {me?.user.fullName.split(" ")[0]}</h1><p className="mt-1 text-sm text-muted">Here&apos;s how {activeOrg?.name ?? "your business"} is performing.</p></div>
         <div role="group" aria-label="Date range" className="flex w-fit rounded-lg border border-border-strong bg-surface p-0.5 shadow-sm">
           {RANGES.map((r) => <button key={r.id} type="button" aria-pressed={range === r.id} onClick={() => setRange(r.id)} className={cn("cursor-pointer rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors", range === r.id ? "bg-navy text-[#f4f1ea] dark:bg-[#f4f1ea] dark:text-[#0b1426]" : "text-muted hover:text-fg")}>{r.label}</button>)}
         </div>

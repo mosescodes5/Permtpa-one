@@ -47,7 +47,7 @@ async fn issue_token_and_mail(state: &AppState, user_id: Uuid, to: &str, purpose
     };
     let text = format!("{lead}\n\n{}/{path}?token={token}\n\nThis link expires in 24 hours and can be used once. If you did not request it, you can ignore this email.", state.cfg.public_url);
     if let Err(e) = state.mailer.send(Email { to: to.to_owned(), subject: subject.into(), text }).await {
-        tracing::error!(error = e, purpose, "failed to send email");
+        tracing::error!(error = %e, purpose, "failed to send email");
     }
     Ok(())
 }
@@ -82,7 +82,7 @@ pub async fn register(State(s): State<AppState>, ClientIp(ip): ClientIp, ApiJson
             drop(tx);
             let notice = Email { to: email.clone(), subject: "You already have a PERMTPA ONE account".into(), text: format!("Someone tried to register with this email address. If it was you, log in or reset your password at {}/login.\nIf it was not you, no action is needed.", s.cfg.public_url) };
             if let Err(e) = s.mailer.send(notice).await {
-                tracing::error!(error = e, "failed to send notice email");
+                tracing::error!(error = %e, "failed to send notice email");
             }
         }
         Err(e) => return Err(e.into()),
