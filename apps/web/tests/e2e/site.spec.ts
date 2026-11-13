@@ -37,3 +37,29 @@ test("security headers are set on the web app", async ({ request }) => {
   expect(res.headers()["x-content-type-options"]).toBe("nosniff");
   expect(res.headers()["x-frame-options"]).toBe("DENY");
 });
+
+test("feature cards react to hover (lift + icon tile fill)", async ({ page, isMobile }) => {
+  test.skip(isMobile, "hover is a pointer interaction");
+  await page.goto("/");
+  const card = page.locator("#platform [data-hover-scope]").first();
+  await card.scrollIntoViewIfNeeded();
+  const tile = card.locator("span").first();
+  const before = await tile.evaluate((el) => getComputedStyle(el).backgroundColor);
+  await card.hover();
+  await expect.poll(() => tile.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(before);
+  const y0 = (await card.boundingBox())!.y;
+  await page.waitForTimeout(400);
+  expect((await card.boundingBox())!.y).toBeLessThan(y0 + 0.5); // lifted (or at least not pushed down)
+});
+
+test.describe("reduced motion", () => {
+  test.use({ reducedMotion: "reduce" });
+  test("looping decorative animations are neutralised and content is still visible", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("one place");
+    const iterations = await page.locator(".animate-float").first().evaluate((el) => getComputedStyle(el).animationIterationCount);
+    expect(iterations).toBe("1");
+    const duration = await page.locator(".animate-drift").first().evaluate((el) => parseFloat(getComputedStyle(el).animationDuration));
+    expect(duration).toBeLessThan(0.05);
+  });
+});

@@ -1,5 +1,6 @@
+import { Fragment } from "react";
 import Link from "next/link";
-import { ArrowRight, BarChart3, Box, ClipboardList, Fingerprint, KeyRound, Landmark, LockKeyhole, ScrollText, ShieldCheck, ShoppingCart, Sparkles, Users, Wallet } from "lucide-react";
+import { ArrowRight, BarChart3, Box, ClipboardList, Fingerprint, KeyRound, Landmark, LockKeyhole, ScrollText, ShieldCheck, ShoppingCart, Sparkles, Users, Wallet } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/reveal";
 import { ProductPreview } from "@/components/marketing/product-preview";
@@ -28,7 +29,7 @@ export default function HomePage() {
     <>
       <section className="relative overflow-hidden">
         <div className="bg-grid absolute inset-0 -z-10 opacity-70" aria-hidden />
-        <div className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-accent/10 blur-[110px]" aria-hidden />
+        <div className="absolute left-1/2 top-0 -z-10 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-accent/10 blur-[110px] animate-drift" aria-hidden />
         <div className="mx-auto max-w-7xl px-5 pb-10 pt-16 text-center sm:px-8 sm:pt-24">
           <Reveal>
             <p className="mx-auto inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface px-3.5 py-1.5 text-xs font-medium text-muted shadow-sm">
@@ -37,7 +38,8 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={0.06}>
             <h1 className="font-display mx-auto mt-7 max-w-4xl text-balance text-[2.75rem] leading-[1.02] sm:text-7xl">
-              Run your whole business from <em className="text-accent not-italic">one place.</em>
+              {["Run", "your", "whole", "business", "from"].map((w, i) => <Fragment key={w}><span className="rise inline-block" style={{ "--i": i } as React.CSSProperties}>{w}</span>{" "}</Fragment>)}
+              <em className="rise inline-block text-accent not-italic" style={{ "--i": 5 } as React.CSSProperties}>one place.</em>
             </h1>
           </Reveal>
           <Reveal delay={0.12}>
@@ -50,14 +52,16 @@ export default function HomePage() {
             <Link href="/#platform"><Button variant="secondary" size="lg">Explore the platform</Button></Link>
           </Reveal>
           <Reveal delay={0.22}><p className="mt-5 text-xs text-subtle">Free plan available · No card required</p></Reveal>
-          <Reveal delay={0.28} className="mx-auto mt-14 max-w-5xl text-left"><ProductPreview /></Reveal>
+          <Reveal delay={0.28} className="mx-auto mt-14 max-w-5xl text-left"><div className="animate-float"><ProductPreview /></div></Reveal>
         </div>
       </section>
 
       <section aria-label="Industries" className="border-y border-border bg-bg-subtle">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-5 py-7 sm:px-8">
-          <span className="text-xs font-medium uppercase tracking-[0.18em] text-subtle">Built for</span>
-          {industries.map((i) => <span key={i} className="font-display text-xl text-muted">{i}</span>)}
+        <div className="marquee-pause mx-auto flex max-w-7xl items-center gap-8 overflow-hidden px-5 py-7 sm:px-8 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]">
+          <span className="shrink-0 text-xs font-medium uppercase tracking-[0.18em] text-subtle">Built for</span>
+          <div className="flex overflow-hidden"><div className="animate-marquee flex shrink-0 gap-12 pr-12">
+            {[...industries, ...industries].map((i, n) => <span key={n} aria-hidden={n >= industries.length} className="font-display shrink-0 text-xl text-muted transition-colors hover:text-accent">{i}</span>)}
+          </div></div>
         </div>
       </section>
 
@@ -70,8 +74,8 @@ export default function HomePage() {
         <div className="mt-12 grid gap-4 lg:grid-cols-4">
           {modules.map((m, i) => (
             <Reveal key={m.title} delay={i * 0.04} className={m.span ?? ""}>
-              <div className="group h-full rounded-2xl border border-border bg-surface p-7 shadow-sm transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md">
-                <span className="inline-flex size-10 items-center justify-center rounded-lg bg-accent-soft text-accent"><m.icon className="size-5" /></span>
+              <div data-hover-scope className="group lift h-full rounded-2xl border border-border bg-surface p-7 shadow-sm">
+                <span className="inline-flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent transition-[background,color,transform] duration-300 group-hover:rotate-[-4deg] group-hover:scale-110 group-hover:bg-accent group-hover:text-accent-fg"><m.icon className="size-6" /></span>
                 <h3 className="mt-5 text-lg font-semibold">{m.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted">{m.body}</p>
               </div>
@@ -112,7 +116,7 @@ export default function HomePage() {
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {security.map((s, i) => (
             <Reveal key={s.t} delay={i * 0.05}>
-              <div className="h-full rounded-2xl border border-border bg-surface p-6"><s.icon className="size-5 text-accent" /><h3 className="mt-4 font-semibold">{s.t}</h3><p className="mt-2 text-sm leading-relaxed text-muted">{s.d}</p></div>
+              <div data-hover-scope className="group lift h-full rounded-2xl border border-border bg-surface p-6"><s.icon className="size-6 text-accent" /><h3 className="mt-4 font-semibold">{s.t}</h3><p className="mt-2 text-sm leading-relaxed text-muted">{s.d}</p></div>
             </Reveal>
           ))}
         </div>

@@ -59,3 +59,41 @@
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 .skeleton { position: relative; overflow: hidden; background: var(--bg-subtle); border-radius: 8px; }
 .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--fg) 7%, transparent), transparent); animation: shimmer 1.6s infinite; }
+
+/* ---------- motion system ---------- */
+@keyframes page-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes drift { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(40px,20px,0) scale(1.12); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes shine { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
+
+@layer utilities {
+  .animate-page-in { animation: page-in .45s cubic-bezier(.22,1,.36,1) both; }
+  .animate-pop-in { animation: pop-in .16s cubic-bezier(.22,1,.36,1) both; transform-origin: top right; }
+  .animate-fade-in { animation: fade-in .18s ease-out both; }
+  .animate-drift { animation: drift 14s ease-in-out infinite; }
+  .animate-float { animation: float 7s ease-in-out infinite; }
+  .animate-marquee { animation: marquee 32s linear infinite; }
+  .animate-grow-x { transform-origin: left; animation: grow-x .9s cubic-bezier(.22,1,.36,1) .25s both; }
+  /* staggered entrance: set style={{ "--i": n }} on children */
+  .rise { animation: rise .55s cubic-bezier(.22,1,.36,1) both; animation-delay: calc(var(--i, 0) * 70ms); }
+  /* hover-lift card with accent edge */
+  .lift { transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s, border-color .25s; }
+  .lift:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  /* sweep of light across primary buttons */
+  .shine { position: relative; overflow: hidden; isolation: isolate; }
+  .shine::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .28), transparent); transform: translateX(-120%) skewX(-18deg); pointer-events: none; }
+  .shine:hover::after { animation: shine .8s ease; }
+  /* animated link underline */
+  .link-u { position: relative; }
+  .link-u::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 1.5px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform .3s cubic-bezier(.22,1,.36,1); }
+  .link-u:hover::after, .link-u:focus-visible::after { transform: scaleX(1); }
+  .marquee-pause:hover .animate-marquee { animation-play-state: paused; }
+}
+
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@layer utilities { .animate-wipe { animation: wipe 1.5s cubic-bezier(.22,1,.36,1) .5s both; } }

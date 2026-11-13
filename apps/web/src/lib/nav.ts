@@ -1,6 +1,6 @@
-import { BarChart3, Bell, Box, Building2, History, LayoutDashboard, Landmark, Settings, ShoppingCart, Sparkles, Truck, UserCog, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Bell, Box, Building2, History, LayoutDashboard, Landmark, Settings, ShoppingCart, Sparkles, Truck, UserCog, Users, type Icon } from "@/components/icons";
 
-export type NavItem = { slug: string; label: string; href: string; icon: LucideIcon; section: "Operate" | "Grow" | "Admin"; milestone: number; blurb: string; shortcut?: string };
+export type NavItem = { slug: string; label: string; href: string; icon: Icon; section: "Operate" | "Grow" | "Admin"; milestone: number; blurb: string; shortcut?: string };
 
 export const NAV: NavItem[] = [
   { slug: "dashboard", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, section: "Operate", milestone: 1, blurb: "Your business at a glance.", shortcut: "G D" },

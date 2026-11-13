@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { AlertTriangle, Bell, Check, ChevronsUpDown, LogOut, Menu, Search, Settings, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Bell, Check, ChevronsUpDown, LogOut, Menu, Search, Settings, ShieldCheck } from "@/components/icons";
 import { useAuth } from "@/components/auth/auth-provider";
 import { Popover } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";

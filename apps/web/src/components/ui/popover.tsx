@@ -16,7 +16,7 @@ export function Popover({ trigger, children, align = "right", className }: { tri
   return (
     <div ref={ref} className="relative">
       {trigger({ open, toggle: () => setOpen((o) => !o), props: { "aria-haspopup": "true", "aria-expanded": open } })}
-      {open && <div role="menu" className={cn("absolute z-50 mt-2 min-w-64 rounded-xl border border-border-strong bg-raised p-1.5 shadow-lg", align === "right" ? "right-0" : "left-0", className)}>{children(() => setOpen(false))}</div>}
+      {open && <div role="menu" className={cn("animate-pop-in absolute z-50 mt-2 min-w-64 rounded-xl border border-border-strong bg-raised p-1.5 shadow-lg", align === "right" ? "right-0" : "left-0", className)}>{children(() => setOpen(false))}</div>}
     </div>
   );
 }

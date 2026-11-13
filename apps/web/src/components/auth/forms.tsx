@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CheckCircle2, Eye, EyeOff, Loader2, MailCheck, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, MailCheck, TriangleAlert } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

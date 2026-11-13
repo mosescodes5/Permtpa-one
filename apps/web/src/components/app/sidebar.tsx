@@ -1,13 +1,16 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useId } from "react";
+import { motion } from "motion/react";
+import { PanelLeftClose, PanelLeftOpen } from "@/components/icons";
 import { NAV, NAV_SECTIONS } from "@/lib/nav";
 import { LogoMark, Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
 export function Sidebar({ collapsed, onToggle, onNavigate }: { collapsed: boolean; onToggle?: () => void; onNavigate?: () => void }) {
   const path = usePathname();
+  const uid = useId();
   return (
     <div className="flex h-full flex-col bg-navy text-[#c9d0e0]">
       <div className={cn("flex h-16 items-center border-b border-white/10", collapsed ? "justify-center" : "px-5")}>
@@ -24,8 +27,8 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: { collapsed: boolea
                 return (
                   <li key={n.slug}>
                     <Link href={n.href} onClick={onNavigate} title={collapsed ? n.label : undefined} aria-current={active ? "page" : undefined}
-                      className={cn("group relative flex items-center gap-3 rounded-lg py-2 text-sm transition-colors", collapsed ? "justify-center px-0" : "px-3", active ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white")}>
-                      {active && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#2fc58f]" />}
+                      className={cn("group relative flex items-center gap-3 rounded-lg py-2 text-sm transition-[background,color,transform] duration-200 hover:translate-x-0.5", collapsed ? "justify-center px-0" : "px-3", active ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white")}>
+                      {active && <motion.span layoutId={`nav-active-${uid}`} transition={{ type: "spring", stiffness: 380, damping: 30 }} className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#2fc58f]" />}
                       <n.icon className={cn("size-[18px] shrink-0", active && "text-[#2fc58f]")} />
                       {!collapsed && <span>{n.label}</span>}
                       {collapsed && <span className="sr-only">{n.label}</span>}

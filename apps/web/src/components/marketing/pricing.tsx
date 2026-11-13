@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check } from "@/components/icons";
 import { PLANS } from "@/lib/plans";
 import { formatMoneyWhole } from "@/lib/money";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export function Pricing() {
       </div>
       <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((p) => (
-          <div key={p.id} className={cn("relative flex flex-col rounded-2xl border p-7", p.highlight ? "border-accent bg-surface shadow-lg ring-1 ring-accent" : "border-border bg-surface shadow-sm")}>
+          <div key={p.id} data-hover-scope className={cn("lift relative flex flex-col rounded-2xl border p-7", p.highlight ? "border-accent bg-surface shadow-lg ring-1 ring-accent" : "border-border bg-surface shadow-sm")}>
             {p.highlight && <span className="absolute -top-3 left-7 rounded-full bg-accent px-3 py-0.5 text-xs font-medium text-accent-fg">Most popular</span>}
             <h3 className="text-lg font-semibold">{p.name}</h3>
             <p className="mt-1 text-sm text-muted">{p.tagline}</p>

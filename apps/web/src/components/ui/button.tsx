@@ -3,12 +3,12 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background,box-shadow,transform,color] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[background,box-shadow,transform,color] duration-200 hover:-translate-y-px hover:shadow-md active:translate-y-px active:scale-[.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0 cursor-pointer",
   {
     variants: {
       variant: {
-        primary: "bg-accent text-accent-fg shadow-sm hover:bg-accent-hover",
-        navy: "bg-navy text-[#f4f1ea] shadow-sm hover:bg-navy-2 dark:bg-[#f4f1ea] dark:text-[#0b1426] dark:hover:bg-white",
+        primary: "shine bg-accent text-accent-fg shadow-sm hover:bg-accent-hover",
+        navy: "shine bg-navy text-[#f4f1ea] shadow-sm hover:bg-navy-2 dark:bg-[#f4f1ea] dark:text-[#0b1426] dark:hover:bg-white",
         secondary: "border border-border-strong bg-surface text-fg shadow-sm hover:bg-bg-subtle",
         ghost: "text-muted hover:bg-bg-subtle hover:text-fg",
         danger: "bg-danger text-white hover:opacity-90",

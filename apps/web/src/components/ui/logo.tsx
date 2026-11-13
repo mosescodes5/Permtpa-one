@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 /** PERMTPA ONE mark: a rounded navy tile with a stylised "1" formed from an emerald ascent. */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden className={cn("size-8", className)}>
+    <svg viewBox="0 0 32 32" aria-hidden className={cn("size-8 transition-transform duration-300 ease-out group-hover:-rotate-6 group-hover:scale-110", className)}>
       <rect width="32" height="32" rx="9" fill="#0B1426" />
       <rect x="0.5" y="0.5" width="31" height="31" rx="8.5" fill="none" stroke="#ffffff" strokeOpacity="0.1" />
       <path d="M12 12.5 17.5 8v16" fill="none" stroke="#2FC58F" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -14,7 +14,7 @@ export function LogoMark({ className }: { className?: string }) {
 
 export function Logo({ className, showProduct = true }: { className?: string; showProduct?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
+    <span className={cn("group inline-flex items-center gap-2.5", className)}>
       <LogoMark />
       <span className="flex items-baseline gap-1.5 leading-none">
         <span className="text-[15px] font-semibold tracking-[0.14em]">PERMTPA</span>

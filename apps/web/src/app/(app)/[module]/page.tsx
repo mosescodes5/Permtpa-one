@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Hourglass } from "lucide-react";
+import { Hourglass } from "@/components/icons";
 import { NAV, findNav } from "@/lib/nav";
 
 export function generateStaticParams() { return NAV.filter((n) => n.slug !== "dashboard").map((n) => ({ module: n.slug })); }

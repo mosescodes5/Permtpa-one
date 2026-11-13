@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Loader2, TriangleAlert } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { api, problemMessage } from "@/lib/api";
 

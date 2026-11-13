@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { MenuToggleIcon } from "@/components/icons";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,7 +20,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
         <Link href="/" aria-label="PERMTPA ONE home"><Logo /></Link>
         <nav aria-label="Primary" className="hidden items-center gap-8 md:flex">
-          {links.map((l) => <Link key={l.href} href={l.href} className="text-sm text-muted transition-colors hover:text-fg">{l.label}</Link>)}
+          {links.map((l) => <Link key={l.href} href={l.href} className="link-u text-sm text-muted transition-colors hover:text-fg">{l.label}</Link>)}
         </nav>
         <div className="hidden items-center gap-2 md:flex">
           <ThemeToggle />
@@ -29,11 +29,11 @@ export function SiteHeader() {
         </div>
         <div className="flex items-center gap-1 md:hidden">
           <ThemeToggle />
-          <Button variant="ghost" size="icon" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</Button>
+          <Button variant="ghost" size="icon" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => setOpen(!open)}><MenuToggleIcon open={open} className="size-5" /></Button>
         </div>
       </div>
       {open && (
-        <div className="border-t border-border bg-bg px-5 pb-5 md:hidden">
+        <div className="animate-page-in border-t border-border bg-bg px-5 pb-5 md:hidden">
           <nav aria-label="Mobile" className="flex flex-col py-2">
             {links.map((l) => <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="py-3 text-base text-fg">{l.label}</Link>)}
           </nav>

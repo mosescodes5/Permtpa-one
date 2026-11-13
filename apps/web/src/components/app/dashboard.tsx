@@ -1,10 +1,11 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Info } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, Info } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
+import { MoneyCountUp } from "@/components/count-up";
 import { LOW_STOCK, RECENT, REVENUE_SERIES, TOP_PRODUCTS, sumSeries, type Range } from "@/lib/sample-data";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -12,11 +13,11 @@ import { useAuth } from "@/components/auth/auth-provider";
 const RANGES: { id: Range; label: string }[] = [{ id: "7d", label: "7 days" }, { id: "30d", label: "30 days" }, { id: "90d", label: "90 days" }];
 const STATUS = { paid: { tone: "accent", label: "Paid" }, owing: { tone: "warning", label: "Owing" }, refunded: { tone: "danger", label: "Refunded" } } as const;
 
-function Kpi({ label, value, delta, up, note }: { label: string; value: string; delta?: string; up?: boolean; note: string }) {
+function Kpi({ label, amount, delta, up, note, i }: { label: string; amount: number; delta?: string; up?: boolean; note: string; i: number }) {
   return (
-    <Card><CardContent>
+    <Card data-hover-scope className="rise lift" style={{ "--i": i } as React.CSSProperties}><CardContent>
       <p className="text-sm text-muted">{label}</p>
-      <p className="tabular font-display mt-2 text-[2rem] leading-none">{value}</p>
+      <p className="tabular font-display mt-2 text-[2rem] leading-none"><MoneyCountUp value={amount} compact /></p>
       <div className="mt-3 flex items-center gap-2 text-xs">
         {delta && <span className={cn("inline-flex items-center gap-0.5 font-medium", up ? "text-accent" : "text-danger")}>{up ? <ArrowUpRight className="size-3.5" /> : <ArrowDownRight className="size-3.5" />}{delta}</span>}
         <span className="text-subtle">{note}</span>
@@ -45,10 +46,10 @@ export function Dashboard() {
       <div role="note" className="flex items-start gap-2.5 rounded-lg border border-border-strong bg-bg-subtle px-4 py-3 text-sm text-muted"><Info className="mt-0.5 size-4 shrink-0 text-accent" /><p>You&apos;re viewing <strong className="font-medium text-fg">sample data</strong> to demonstrate the interface. Live figures appear once sales, inventory and finance modules are connected.</p></div>
 
       <section aria-label="Key figures" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Revenue" value={formatMoney(totals.revenue, "NGN", { compact: true })} delta="12.4%" up note="vs previous period" />
-        <Kpi label="Gross profit" value={formatMoney(totals.profit, "NGN", { compact: true })} delta="8.1%" up note="revenue − cost of goods" />
-        <Kpi label="Net profit" value={formatMoney(net, "NGN", { compact: true })} delta="2.3%" up note="after expenses" />
-        <Kpi label="Outstanding debts" value={formatMoney(312_000_00, "NGN", { compact: true })} delta="4 new" up={false} note="14 customers" />
+        <Kpi i={0} label="Revenue" amount={totals.revenue} delta="12.4%" up note="vs previous period" />
+        <Kpi i={1} label="Gross profit" amount={totals.profit} delta="8.1%" up note="revenue − cost of goods" />
+        <Kpi i={2} label="Net profit" amount={net} delta="2.3%" up note="after expenses" />
+        <Kpi i={3} label="Outstanding debts" amount={312_000_00} delta="4 new" up={false} note="14 customers" />
       </section>
 
       <div className="grid gap-4 xl:grid-cols-[1.8fr_1fr]">
@@ -78,7 +79,7 @@ export function Dashboard() {
             {LOW_STOCK.map((p) => (
               <div key={p.name}>
                 <div className="flex items-baseline justify-between text-sm"><span className="font-medium">{p.name}</span><span className="tabular text-muted">{p.left} left</span></div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-subtle" role="progressbar" aria-valuenow={p.left} aria-valuemin={0} aria-valuemax={p.reorder} aria-label={`${p.name} stock level`}><div className="h-full rounded-full bg-warning" style={{ width: `${Math.min(100, (p.left / p.reorder) * 100)}%` }} /></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-subtle" role="progressbar" aria-valuenow={p.left} aria-valuemin={0} aria-valuemax={p.reorder} aria-label={`${p.name} stock level`}><div className="animate-grow-x h-full rounded-full bg-warning" style={{ width: `${Math.min(100, (p.left / p.reorder) * 100)}%` }} /></div>
                 <p className="mt-1 text-[11px] text-subtle">Reorder at {p.reorder}</p>
               </div>
             ))}
@@ -92,7 +93,7 @@ export function Dashboard() {
           <CardContent className="overflow-x-auto pt-3">
             <table className="w-full text-sm"><caption className="sr-only">Top products by revenue</caption>
               <thead><tr className="text-left text-xs text-subtle"><th className="pb-2 font-medium">Product</th><th className="pb-2 text-right font-medium">Units</th><th className="pb-2 text-right font-medium">Revenue</th></tr></thead>
-              <tbody className="divide-y divide-border">{TOP_PRODUCTS.map((p) => <tr key={p.sku}><td className="py-3"><p className="font-medium">{p.name}</p><p className="font-mono text-[11px] text-subtle">{p.sku}</p></td><td className="tabular py-3 text-right text-muted">{p.units}</td><td className="tabular py-3 text-right font-medium">{formatMoney(p.revenue, "NGN", { compact: true })}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-border">{TOP_PRODUCTS.map((p) => <tr key={p.sku} className="transition-colors hover:bg-bg-subtle"><td className="py-3"><p className="font-medium">{p.name}</p><p className="font-mono text-[11px] text-subtle">{p.sku}</p></td><td className="tabular py-3 text-right text-muted">{p.units}</td><td className="tabular py-3 text-right font-medium">{formatMoney(p.revenue, "NGN", { compact: true })}</td></tr>)}</tbody>
             </table>
           </CardContent>
         </Card>
@@ -101,7 +102,7 @@ export function Dashboard() {
           <CardContent className="overflow-x-auto pt-3">
             <table className="w-full text-sm"><caption className="sr-only">Recent transactions</caption>
               <thead><tr className="text-left text-xs text-subtle"><th className="pb-2 font-medium">Sale</th><th className="pb-2 font-medium">Status</th><th className="pb-2 text-right font-medium">Amount</th></tr></thead>
-              <tbody className="divide-y divide-border">{RECENT.map((t) => <tr key={t.id}><td className="py-3"><p className="font-medium">{t.customer}</p><p className="text-[11px] text-subtle">{t.id} · {t.method} · {t.time}</p></td><td className="py-3"><Badge tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Badge></td><td className="tabular py-3 text-right font-medium">{formatMoney(t.amount)}</td></tr>)}</tbody>
+              <tbody className="divide-y divide-border">{RECENT.map((t) => <tr key={t.id} className="transition-colors hover:bg-bg-subtle"><td className="py-3"><p className="font-medium">{t.customer}</p><p className="text-[11px] text-subtle">{t.id} · {t.method} · {t.time}</p></td><td className="py-3"><Badge tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Badge></td><td className="tabular py-3 text-right font-medium">{formatMoney(t.amount)}</td></tr>)}</tbody>
             </table>
           </CardContent>
         </Card>

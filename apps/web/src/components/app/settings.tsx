@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Laptop, Loader2, LogOut, ShieldCheck, ShieldOff, Smartphone } from "lucide-react";
+import { Laptop, Loader2, LogOut, ShieldCheck, ShieldOff, Smartphone } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

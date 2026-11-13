@@ -1,5 +1,5 @@
-import { ArrowUpRight, Box, LayoutDashboard, Receipt, ShoppingCart, Sparkles, Users, Wallet } from "lucide-react";
-import { formatMoney } from "@/lib/money";
+import { ArrowUpRight, Box, LayoutDashboard, Receipt, ShoppingCart, Sparkles, Users, Wallet } from "@/components/icons";
+import { MoneyCountUp } from "@/components/count-up";
 
 const series = [38, 44, 41, 52, 49, 61, 58, 70, 66, 79, 74, 92];
 
@@ -37,10 +37,10 @@ export function ProductPreview() {
             <span className="rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-medium text-accent">Sample data</span>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {[["Revenue today", formatMoney(184_250_00, "NGN", { compact: true }), "+12.4%"], ["Gross profit", formatMoney(71_900_00, "NGN", { compact: true }), "+8.1%"], ["Expenses", formatMoney(26_400_00, "NGN", { compact: true }), "-3.2%"], ["Owed to you", formatMoney(312_000_00, "NGN", { compact: true }), "14 invoices"]].map(([k, v, d]) => (
+            {[["Revenue today", 184_250_00, "+12.4%"], ["Gross profit", 71_900_00, "+8.1%"], ["Expenses", 26_400_00, "-3.2%"], ["Owed to you", 312_000_00, "14 invoices"]].map(([k, v, d]) => (
               <div key={k} className="rounded-lg border border-border bg-bg p-3">
                 <p className="text-[10px] text-subtle">{k}</p>
-                <p className="tabular mt-1 text-base font-semibold sm:text-lg">{v}</p>
+                <p className="tabular mt-1 text-base font-semibold sm:text-lg"><MoneyCountUp value={v as number} compact /></p>
                 <p className="mt-0.5 text-[10px] text-accent">{d}</p>
               </div>
             ))}
@@ -48,7 +48,7 @@ export function ProductPreview() {
           <div className="mt-3 grid gap-3 lg:grid-cols-[1.6fr_1fr]">
             <div className="rounded-lg border border-border bg-bg p-3">
               <div className="flex items-center justify-between"><p className="text-xs font-medium">Revenue · last 12 weeks</p><ArrowUpRight className="size-3.5 text-accent" /></div>
-              <svg viewBox="0 0 520 150" className="mt-2 h-28 w-full" preserveAspectRatio="none" aria-hidden>
+              <svg viewBox="0 0 520 150" className="animate-wipe mt-2 h-28 w-full" preserveAspectRatio="none" aria-hidden>
                 <defs><linearGradient id="pv" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="var(--accent)" stopOpacity="0.28" /><stop offset="1" stopColor="var(--accent)" stopOpacity="0" /></linearGradient></defs>
                 <path d={fill} fill="url(#pv)" /><path d={line} fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
               </svg>

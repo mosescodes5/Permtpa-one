@@ -2,6 +2,16 @@
 
 _Every result below was produced by actually running the command in the build sandbox (Ubuntu 24.04). Nothing here was run in Docker — see Known issues._
 
+## UI refresh — animated icon set & motion (post-M2): **COMPLETE (verified in sandbox)**
+- **Icons:** removed Lucide entirely (dependency uninstalled). New original duotone icon set in `apps/web/src/components/icons` — 50 icons, each with its own hover animation (cart rolls, box lid lifts, bars regrow, bell swings, gear turns, shield check redraws, lock shackle lifts, etc.). Icons react when their nearest `a`/`button`/`[data-hover-scope]` ancestor is hovered or focused, so no call-site changes were needed.
+- **Motion:** hero word-stagger, floating product preview, drifting gradient glow, chart wipe-in, count-up KPIs (also ease between values when the date filter changes), industries marquee (pauses on hover), card lift + icon-tile fill on hover, shine sweep on primary buttons, animated link underlines, hamburger→X morph, sliding sidebar active indicator, pop-in menus / command palette, route transitions, growing progress bars.
+- **Accessibility:** `<MotionConfig reducedMotion="user">` + global CSS rule; server HTML already contains final numbers/text (no JS needed to read content).
+- **Verification:** eslint 0 problems, tsc clean, Vitest 31 passed, full-stack Playwright **22 passed, 2 skipped** (new tests: card hover effect, reduced-motion behaviour). Visually reviewed an icon gallery, hero, and a mid-hover frame.
+- **Bug caught visually:** hero headline words rendered without spaces (trailing space inside `inline-block` collapses); fixed by placing spaces between the animated spans.
+- **Not verified:** animations were checked in Chromium only (no Safari/Firefox); no performance profiling on low-end phones; the dashboard in dark mode was not re-screenshotted after the refresh (covered by e2e only).
+
+---
+
 ## Milestone 2 — Authentication, sessions, MFA, tenancy wiring: **COMPLETE (verified in sandbox)**
 
 ### Delivered

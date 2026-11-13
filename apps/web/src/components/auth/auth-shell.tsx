@@ -16,7 +16,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
         <p className="text-center text-xs text-subtle">PERMTPA ONE is a technology product by PERMTPA.</p>
       </div>
       <aside className="relative hidden overflow-hidden bg-navy p-12 text-[#f4f1ea] lg:flex lg:flex-col lg:justify-between" aria-hidden>
-        <div className="absolute -right-24 -top-24 size-[480px] rounded-full bg-[#2fc58f]/15 blur-[100px]" />
+        <div className="animate-drift absolute -right-24 -top-24 size-[480px] rounded-full bg-[#2fc58f]/15 blur-[100px]" />
         <div className="bg-grid absolute inset-0 opacity-25" />
         <p className="relative text-xs font-medium uppercase tracking-[0.2em] text-[#2fc58f]">One business. One platform.</p>
         <div className="relative">

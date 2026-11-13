@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CornerDownLeft, Moon, Search, Sun } from "lucide-react";
+import { CornerDownLeft, Moon, Search, Sun } from "@/components/icons";
 import { useTheme } from "next-themes";
 import { NAV } from "@/lib/nav";
 import { Kbd } from "@/components/ui/kbd";
@@ -30,8 +30,8 @@ function PaletteDialog({ onClose }: { onClose: () => void }) {
   const run = (c?: Cmd) => { if (!c) return; onClose(); c.run(); };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-navy/50 px-4 pt-[14vh] backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label="Command palette" className="w-full max-w-xl overflow-hidden rounded-2xl border border-border-strong bg-raised shadow-lg"
+    <div className="animate-fade-in fixed inset-0 z-[60] flex items-start justify-center bg-navy/50 px-4 pt-[14vh] backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Command palette" className="animate-pop-in w-full max-w-xl origin-top overflow-hidden rounded-2xl border border-border-strong bg-raised shadow-lg"
         onKeyDown={(e) => {
           if (e.key === "Escape") onClose();
           if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }

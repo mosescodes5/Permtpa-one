@@ -4,6 +4,7 @@ import "@fontsource-variable/jetbrains-mono";
 import "@fontsource/instrument-serif";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MotionProvider } from "@/components/motion-provider";
 
 export const metadata: Metadata = {
   title: { default: "PERMTPA ONE — One business. One platform. Total control.", template: "%s · PERMTPA ONE" },
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider><MotionProvider>{children}</MotionProvider></ThemeProvider>
       </body>
     </html>
   );
