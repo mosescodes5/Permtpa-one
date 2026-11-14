@@ -54,7 +54,18 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/orgs/{org_id}/members/{user_id}", patch(crate::team::member_update).delete(crate::team::member_remove))
         .route("/v1/orgs/{org_id}/invitations", get(crate::team::list_invitations).post(crate::team::invite))
         .route("/v1/orgs/{org_id}/invitations/{id}", delete(crate::team::revoke_invitation))
-        .route("/v1/invitations/accept", post(crate::team::accept_invitation));
+        .route("/v1/invitations/accept", post(crate::team::accept_invitation))
+        .route("/v1/orgs/{org_id}/categories", get(crate::inventory::categories_list).post(crate::inventory::category_create))
+        .route("/v1/orgs/{org_id}/categories/{id}", patch(crate::inventory::category_update).delete(crate::inventory::category_delete))
+        .route("/v1/orgs/{org_id}/products", get(crate::inventory::product_list).post(crate::inventory::product_create))
+        .route("/v1/orgs/{org_id}/products/{id}", get(crate::inventory::product_get).patch(crate::inventory::product_update))
+        .route("/v1/orgs/{org_id}/products/{id}/variants", post(crate::inventory::variant_create))
+        .route("/v1/orgs/{org_id}/variants/{id}", patch(crate::inventory::variant_update))
+        .route("/v1/orgs/{org_id}/variants/{id}/stock", post(crate::inventory::stock_adjust))
+        .route("/v1/orgs/{org_id}/variants/{id}/movements", get(crate::inventory::movements))
+        .route("/v1/orgs/{org_id}/inventory/lookup", get(crate::inventory::lookup))
+        .route("/v1/orgs/{org_id}/inventory/low-stock", get(crate::inventory::low_stock))
+        .route("/v1/orgs/{org_id}/inventory/valuation", get(crate::inventory::valuation));
     // The development outbox exists ONLY in development (404 everywhere else — see tests).
     if state.cfg.environment == Environment::Development {
         v1 = v1.route("/v1/dev/outbox", get(dev_outbox)).route("/v1/dev/reset-rate-limits", post(dev_reset_rate_limits));

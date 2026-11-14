@@ -4,6 +4,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod error;
+pub mod inventory;
 pub mod mailer;
 pub mod mfa;
 pub mod orgs;

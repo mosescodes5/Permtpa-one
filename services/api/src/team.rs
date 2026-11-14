@@ -19,7 +19,7 @@ use uuid::Uuid;
 type Tx = Transaction<'static, Postgres>;
 
 /// Enter an organization context and resolve the caller's role. A non-member gets 404 (indistinguishable from a missing org).
-async fn org_tx(s: &AppState, sess: &AuthSession, org_id: Uuid) -> Result<(Tx, OrgRole), ApiError> {
+pub(crate) async fn org_tx(s: &AppState, sess: &AuthSession, org_id: Uuid) -> Result<(Tx, OrgRole), ApiError> {
     let mut tx = begin_tenant_tx(&s.pool, TenantContext { user_id: Some(sess.user_id), org_id: Some(org_id) }).await?;
     let role: Option<String> = sqlx::query_scalar("select app.current_role()::text").fetch_one(&mut *tx).await?;
     let role = role.ok_or(ApiError::NotFound)?.parse::<OrgRole>().map_err(ApiError::internal)?;
@@ -31,13 +31,24 @@ fn require_admin(role: OrgRole) -> Result<(), ApiError> {
 }
 
 /// Translate database rejections (RLS, triggers, constraints) into precise HTTP errors.
-fn map_db(e: sqlx::Error) -> ApiError {
+pub(crate) fn map_db(e: sqlx::Error) -> ApiError {
     if let sqlx::Error::Database(d) = &e {
         match d.code().as_deref() {
             Some("42501") => return ApiError::Forbidden { code: "forbidden" },
             Some("P0001") if d.message().contains("active owner") => return ApiError::Conflict { code: "last_owner" },
-            Some("23505") => return ApiError::Conflict { code: "conflict" },
+            Some("P0001") if d.message().contains("insufficient stock") => return ApiError::Conflict { code: "insufficient_stock" },
+            Some("23505") => {
+                return ApiError::Conflict {
+                    code: match d.constraint() {
+                        Some("variants_org_id_sku_key") => "sku_taken",
+                        Some("variants_org_barcode_uq") => "barcode_taken",
+                        Some("categories_org_id_name_key") => "name_taken",
+                        _ => "conflict",
+                    },
+                }
+            }
             Some("23503") => return ApiError::bad("invalid_reference", "Choose a valid value."),
+            Some("23514") => return ApiError::bad("invalid_value", "One of the values is out of range."),
             _ => {}
         }
     }
