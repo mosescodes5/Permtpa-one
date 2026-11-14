@@ -86,6 +86,11 @@ pub async fn category_delete(State(s): State<AppState>, sess: AuthSession, Path(
     }
 }
 
+/// Single source of truth for page size: default 50, never more than 100.
+fn page_limit(requested: i64) -> i64 {
+    if requested <= 0 { 50 } else { requested.min(100) }
+}
+
 // ------------------------------------------------------------------ products
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -155,11 +160,20 @@ struct Filter {
     offset: i64,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::page_limit;
+    #[test]
+    fn page_size_is_bounded() {
+        assert_eq!((page_limit(0), page_limit(-5), page_limit(7), page_limit(100), page_limit(101), page_limit(i64::MAX)), (50, 50, 7, 100, 100, 100));
+    }
+}
+
 /// One round trip per page: variants are aggregated in SQL (no N+1). Cost columns are NULL for roles RLS hides them from.
 async fn fetch_products(tx: &mut Tx, org: Uuid, f: &Filter) -> Result<(Vec<Value>, i64), ApiError> {
     let search = f.search.as_ref().map(|s| s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
     let status = f.status.clone().unwrap_or_else(|| "active".into());
-    let limit = if f.limit <= 0 { 50 } else { f.limit.min(100) };
+    let limit = page_limit(f.limit);
     const WHERE: &str = "p.org_id = $1 and ($2::uuid is null or p.id = $2) and ($3::uuid is null or p.category_id = $3) and ($4 = 'all' or p.status = $4)
         and ($5::text is null or p.name ilike '%' || $5 || '%' or exists (select 1 from variants v2 where v2.product_id = p.id and v2.org_id = p.org_id and (v2.sku::text ilike $5 || '%' or v2.barcode = $6)))";
     let total: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("select count(*) from products p where {WHERE}"))).bind(org).bind(f.id).bind(f.category).bind(&status).bind(&search).bind(f.search.as_deref()).fetch_one(&mut **tx).await?;
@@ -200,7 +214,7 @@ pub async fn product_list(State(s): State<AppState>, sess: AuthSession, Path(org
     let f = Filter { id: None, search, category: q.category, status: q.status, limit: q.limit.unwrap_or(50), offset: q.offset.unwrap_or(0) };
     let (items, total) = fetch_products(&mut tx, org, &f).await?;
     tx.rollback().await?;
-    Ok(Json(json!({ "items": items, "total": total, "limit": if f.limit <= 0 { 50 } else { f.limit.min(100) }, "offset": f.offset.clamp(0, 100_000) })))
+    Ok(Json(json!({ "items": items, "total": total, "limit": page_limit(f.limit), "offset": f.offset.clamp(0, 100_000) })))
 }
 
 pub async fn product_get(State(s): State<AppState>, sess: AuthSession, Path((org, id)): Path<(Uuid, Uuid)>) -> Result<Json<Value>, ApiError> {

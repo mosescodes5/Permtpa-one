@@ -332,7 +332,13 @@ async fn search_pagination_and_category_rules() {
     let names = |r: &common::Resp| r.json["items"].as_array().unwrap().iter().map(|i| i["name"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
     let p3 = app.get(&format!("{b}/products?limit=3&offset=6"), org.owner.call()).await;
     assert_eq!(names(&p3).len(), 2);
-    assert_eq!(app.get(&format!("{b}/products?limit=100000"), org.owner.call()).await.json["limit"], 100, "page size is capped");
+    // bulk-load 105 more products through the superuser fixture, then ask for an absurd page size
+    sqlx::query("with p as (insert into products (org_id, name, created_by) select $1::uuid, 'Bulk ' || g, (select user_id from memberships where org_id = $1::uuid limit 1) from generate_series(1, 105) g returning id, name) insert into variants (org_id, product_id, sku, price_minor) select $1::uuid, id, 'BULK-' || substr(name, 6), 1 from p")
+        .bind(&org.id).execute(&app.db.fixture).await.unwrap();
+    let big = app.get(&format!("{b}/products?limit=100000"), org.owner.call()).await;
+    assert_eq!((big.json["limit"].as_i64(), big.json["items"].as_array().unwrap().len(), big.json["total"].as_i64()), (Some(100), 100, Some(113)), "page size is capped: only 100 of 113 rows are returned");
+    let rest = app.get(&format!("{b}/products?limit=100000&offset=100"), org.owner.call()).await;
+    assert_eq!(rest.json["items"].as_array().unwrap().len(), 13);
     assert_eq!(app.get(&q("widget%253"), org.owner.call()).await.json["total"], 0, "a literal % (encoded as %25) is not a wildcard");
     assert_eq!(app.get(&q("widget%203"), org.owner.call()).await.json["total"], 1, "%20 is just a space: 'widget 3'");
     assert_eq!(names(&app.get(&q("widget"), org.owner.call()).await).len(), 7);
