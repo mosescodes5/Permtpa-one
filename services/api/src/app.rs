@@ -57,7 +57,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/invitations/accept", post(crate::team::accept_invitation));
     // The development outbox exists ONLY in development (404 everywhere else — see tests).
     if state.cfg.environment == Environment::Development {
-        v1 = v1.route("/v1/dev/outbox", get(dev_outbox));
+        v1 = v1.route("/v1/dev/outbox", get(dev_outbox)).route("/v1/dev/reset-rate-limits", post(dev_reset_rate_limits));
     }
     let v1 = v1.layer(middleware::from_fn_with_state(state.clone(), session::csrf_guard));
 
@@ -74,6 +74,16 @@ pub fn router(state: AppState) -> Router {
         .layer(TraceLayer::new_for_http())
         .layer(PropagateRequestIdLayer::new(REQUEST_ID))
         .layer(SetRequestIdLayer::new(REQUEST_ID, MakeRequestUuid))
+}
+
+/// Development only: clears all rate-limit counters so end-to-end tests do not share one bucket (they all come from localhost).
+async fn dev_reset_rate_limits(State(s): State<AppState>) -> Result<StatusCode, crate::error::ApiError> {
+    let mut conn = s.redis.get_multiplexed_async_connection().await.map_err(crate::error::ApiError::internal)?;
+    let keys: Vec<String> = redis::cmd("KEYS").arg("rl:*").query_async(&mut conn).await.map_err(crate::error::ApiError::internal)?;
+    if !keys.is_empty() {
+        redis::cmd("DEL").arg(&keys).query_async::<i64>(&mut conn).await.map_err(crate::error::ApiError::internal)?;
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn dev_outbox(State(s): State<AppState>) -> Json<Value> {

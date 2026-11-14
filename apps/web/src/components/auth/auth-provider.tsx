@@ -41,8 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (state.status === "anonymous") router.replace(explicitLogout.current ? "/login" : `/login?next=${encodeURIComponent(path)}`);
-    else if (state.status === "authenticated" && state.me && state.me.memberships.length === 0 && path !== "/onboarding") router.replace("/onboarding");
+    if (state.status === "anonymous") router.replace(explicitLogout.current ? "/login" : `/login?next=${encodeURIComponent(path + window.location.search)}`);
+    else if (state.status === "authenticated" && state.me && state.me.memberships.length === 0 && path !== "/onboarding" && path !== "/accept-invite") router.replace("/onboarding");
   }, [state, path, router]);
 
   const logout = useCallback(async () => {

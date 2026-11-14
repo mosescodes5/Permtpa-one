@@ -243,6 +243,10 @@ async fn login_is_rate_limited_per_ip() {
         }
     }
     assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
+    // development-only reset clears the counters
+    assert_eq!(app.post("/v1/dev/reset-rate-limits", json!({}), Call::default()).await.status, StatusCode::NO_CONTENT);
+    let after = app.post("/v1/auth/login", json!({"email":"nobody@example.test","password":"whatever-pass-1"}), Call { ip: Some(&ip), ..Default::default() }).await;
+    assert_eq!(after.status, StatusCode::UNAUTHORIZED, "limit was reset");
     let other_ip = rand_ip();
     let r = app.post("/v1/auth/login", json!({"email":"x@example.test","password":"whatever-pass-1"}), Call { ip: Some(&other_ip), ..Default::default() }).await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED, "a different client is unaffected");
@@ -379,6 +383,7 @@ async fn production_mode_hardens_cookies_and_hides_dev_endpoints() {
 
     let prod = TestApp::new("production").await;
     assert_eq!(prod.get("/v1/dev/outbox", Call::default()).await.status, StatusCode::NOT_FOUND, "dev outbox must not exist in production");
+    assert_eq!(prod.post("/v1/dev/reset-rate-limits", json!({}), Call::default()).await.status, StatusCode::NOT_FOUND, "rate-limit reset must not exist in production");
     let (email, ip) = (uniq("prod"), rand_ip());
     prod.signup_verified(&email, PW, &ip).await;
     let r = prod.post("/v1/auth/login", json!({"email":email,"password":PW}), Call { ip: Some(&ip), ..Default::default() }).await;

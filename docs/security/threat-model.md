@@ -30,6 +30,17 @@ This is a living document. "Tested by" names the automated test that fails if th
 | Header injection in email | address parsing rejects CR/LF | `recipient_header_injection_is_rejected` |
 | Plaintext SMTP in prod | config refuses it | `smtp_must_use_tls_outside_development` |
 
+## Team management (Milestone 3A)
+| Threat | Control | Tested by |
+|---|---|---|
+| Privilege escalation via roles | Owner/Admin-only writes; admins cannot touch or create owners (RLS + API) | `only_owners_and_administrators_manage_the_team`, SQL suite |
+| Org left without an owner | Last-owner trigger → 409 | `ownership_transfer_and_last_owner_protection` |
+| Leaked / forwarded invitation link | Token bound to the invited *verified* email; single-use; 7-day expiry; stored hashed | `invitation_is_bound_to_the_invited_email…`, SQL suite |
+| Cross-tenant team attacks | Non-members get 404 for every team endpoint | `cross_tenant_team_attacks_all_return_404` |
+| Suspended insiders | Suspended members are treated as non-members | `suspended_members_lose_access…` |
+| Untraceable changes | DB triggers write audit rows with the real actor; no tokens in metadata | `team_changes_are_audited…`, SQL suite |
+Defence in depth is deliberate: removing the API role check alone changes nothing (the database still refuses); only removing both is detected by the tests.
+
 ## Residual risks / not yet done
 - Client IP trust depends on `TRUSTED_PROXY_HOPS` matching the real topology; wrong values either collapse all users into one rate-limit bucket or let attackers spoof IPs.
 - No breached-password corpus check (only a tiny deny-list); no CAPTCHA/bot scoring; account lockout can be used to temporarily deny a victim (capped at 60 min).

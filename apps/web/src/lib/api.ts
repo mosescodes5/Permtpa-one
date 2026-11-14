@@ -10,7 +10,7 @@ export class ApiProblem extends Error {
 let csrfToken: string | null = null;
 export const setCsrfToken = (t: string | null) => { csrfToken = t; };
 
-type Opts = { method?: "GET" | "POST" | "DELETE"; body?: unknown };
+type Opts = { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown };
 
 async function raw(path: string, opts: Opts, withCsrf: boolean): Promise<Response> {
   const headers: Record<string, string> = {};
@@ -49,6 +49,13 @@ export type Me = {
 };
 export type SessionInfo = { id: string; createdAt: string; lastSeenAt: string; userAgent: string | null; ip: string | null; current: boolean };
 
+export type Member = { userId: string; fullName: string; email: string | null; role: string; status: string };
+export type Invitation = { id: string; email: string; role: string; createdAt: string; expiresAt: string };
+export type OrgProfile = { id: string; name: string; slug: string; businessType: string; currency: string; yourRole: string };
+export const ROLE_LABELS: Record<string, string> = { owner: "Owner", administrator: "Administrator", manager: "Manager", accountant: "Accountant", inventory_manager: "Inventory Manager", sales_staff: "Sales Staff", read_only: "Read Only" };
+export const ROLE_HELP: Record<string, string> = { owner: "Full control, including billing and ownership", administrator: "Manages the team and settings", manager: "Runs day-to-day operations", accountant: "Finance and reports", inventory_manager: "Products and stock", sales_staff: "Records sales", read_only: "Can view, cannot change" };
+export const ASSIGNABLE_ROLES = ["administrator", "manager", "accountant", "inventory_manager", "sales_staff", "read_only"] as const;
+
 export const BUSINESS_TYPES = [
   ["retail", "Retail"], ["agriculture", "Agriculture"], ["restaurant", "Restaurant"], ["distribution", "Distribution"],
   ["services", "Services"], ["agency", "Agency"], ["other", "Other"],
@@ -63,6 +70,11 @@ export function problemMessage(e: unknown): string {
     case "rate_limited": return "Too many attempts. Please wait a few minutes and try again.";
     case "invalid_token": return "This link is invalid or has expired. Request a new one.";
     case "weak_password": return "Choose a less predictable password.";
+    case "forbidden": return "You do not have permission to do that.";
+    case "last_owner": return "An organization must keep at least one owner.";
+    case "already_member": return "That person is already on your team.";
+    case "conflict": return "That conflicts with something that already exists.";
+    case "invalid_role": return "Choose a valid role.";
     case "unavailable": return "The service is temporarily unavailable. Please try again shortly.";
     default: return e.status >= 500 ? "Something went wrong on our side. Please try again." : e.message;
   }

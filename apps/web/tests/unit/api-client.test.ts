@@ -47,3 +47,13 @@ describe("api client", () => {
     expect(problemMessage(new TypeError("fetch failed"))).toMatch(/could not reach the server/i);
   });
 });
+
+describe("api client: PATCH", () => {
+  it("sends PATCH with the session-bound CSRF token", async () => {
+    setCsrfToken("T");
+    f.mockReturnValueOnce(res(200, { ok: 1 }));
+    await api("/v1/orgs/x/members/y", { method: "PATCH", body: { role: "manager" } });
+    expect(f.mock.calls[0]![1].method).toBe("PATCH");
+    expect(headersOf(0)["x-csrf-token"]).toBe("T");
+  });
+});

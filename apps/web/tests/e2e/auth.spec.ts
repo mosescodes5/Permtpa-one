@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { PASSWORD, alertOf, createVerifiedUser, createWorkspace, emailedToken, loginViaUi, randomIp, totp, uniqueEmail } from "./helpers";
+import { PASSWORD, alertOf, createVerifiedUser, createWorkspace, emailedToken, loginViaUi, resetRateLimits, totp, uniqueEmail } from "./helpers";
 
-test.beforeEach(({ context }) => context.setExtraHTTPHeaders({ "x-forwarded-for": randomIp() }));
+test.beforeEach(({ request }) => resetRateLimits(request));
 
 test("full journey: register → verify → login → onboarding → dashboard → logout", async ({ page, request, isMobile }) => {
   const email = uniqueEmail("journey");

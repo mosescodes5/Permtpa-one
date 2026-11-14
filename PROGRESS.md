@@ -2,6 +2,44 @@
 
 _Every result below was produced by actually running the command in the build sandbox (Ubuntu 24.04). Nothing here was run in Docker — see Known issues._
 
+## Milestone 3 · Part A — Teams & organizations: **COMPLETE (verified in sandbox)**
+Part B (products / inventory) is **not started**.
+
+### Delivered
+- **DB (migration 0007):** `app.accept_invitation()` (caller's *verified* email must equal the invited email; atomic single use), one-pending-invitation-per-email index, automatic audit triggers for membership changes / invitations / org edits (actor comes from the transaction context, never the client).
+- **API:** org profile (GET/PATCH), invitations (create, list, revoke, accept), member role/status change and removal. Roles enforced twice (explicit checks + RLS); DB rejections map to 403 / 409 `last_owner`; non-members get 404; `deny_unknown_fields` everywhere; invitation tokens stored hashed and never returned by the API; owners can never be granted by invitation.
+- **Web:** Team page (members, role selects, suspend/reinstate, confirm-to-remove, invite form, pending invites), Organization page, accept-invite flow (token survives the login redirect; invitees are not forced into onboarding), role-aware UI (Managers etc. see a read-only list without colleagues' emails).
+
+### Verification (final fresh run)
+| Check | Result |
+|---|---|
+| ESLint / tsc | 0 problems / clean |
+| Vitest | **32 passed** |
+| `cargo test --workspace` (non-DB) | **27 passed** |
+| HTTP suites (real PG + Redis): auth_flow / **team** / tenancy / smtp | **13 / 9 / 3 / 2 passed** |
+| SQL adversarial suite | **83 passed, 0 failed** |
+| Full-stack Playwright (desktop + mobile) | **25 passed, 5 skipped, 0 failed** (incl. 3 new team specs) |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Mutation tests — team API | 8 caught directly; 2 are **equivalent mutants** because the database enforces the same rule (proven: removing the API check *and* the RLS policy together is caught) |
+| Mutation tests — new SQL | 2/2 caught (invitation email binding, audit trigger) |
+
+### Mistakes made and fixed this round (for honesty)
+1. **My first mutation run was INVALID.** `team.rs` was not yet committed, so the script's `git checkout` restore silently did nothing and mutations accumulated; the "CAUGHT" lines were just a broken baseline failing. I detected it when the baseline itself failed, restored the file from source, committed, added a baseline gate + restore-verification to the script, and re-ran everything. Only the re-run results above are valid.
+2. **Wrong claim from M2 corrected** (see the TRUSTED_PROXY_HOPS note above); it surfaced as 3 flaky mobile e2e failures caused by a shared rate-limit bucket (13 registrations vs a limit of 10/hour).
+3. Windows: the e2e API start command used a Unix path and failed on `cmd.exe`; now `cargo run -p permtpa-api` with `cwd` (verified on Linux only — **not tested on Windows**).
+4. A stray Redis `dump.rdb` was committed; removed and git-ignored. UI copy for a wrong-account invitation was too generic; fixed.
+
+### Known issues / not verified
+- Windows: `scripts/e2e-setup.sh` needs Git Bash or WSL; Postgres, Redis and Rust must be installed. Only Linux was tested.
+- No ownership-transfer UI beyond changing roles; no "leave organization" for non-admins; no invitation resend button (re-inviting replaces the old link).
+- Invitation emails use the same SMTP path (verified only against a local plaintext sink).
+- Docker, `clippy`, `rustfmt --check`, `cargo audit`, `cargo deny` still not run in this sandbox.
+
+### Next
+**Milestone 3 · Part B — Inventory:** categories, products, variants, SKUs, barcodes, append-only stock movements, adjustments with reasons, reorder thresholds, valuation (cost prices visible only to finance-capable roles), and real data for the dashboard's low-stock card.
+
+---
+
 ## UI refresh — animated icon set & motion (post-M2): **COMPLETE (verified in sandbox)**
 - **Icons:** removed Lucide entirely (dependency uninstalled). New original duotone icon set in `apps/web/src/components/icons` — 50 icons, each with its own hover animation (cart rolls, box lid lifts, bars regrow, bell swings, gear turns, shield check redraws, lock shackle lifts, etc.). Icons react when their nearest `a`/`button`/`[data-hover-scope]` ancestor is hovered or focused, so no call-site changes were needed.
 - **Motion:** hero word-stagger, floating product preview, drifting gradient glow, chart wipe-in, count-up KPIs (also ease between values when the date filter changes), industries marquee (pauses on hover), card lift + icon-tile fill on hover, shine sweep on primary buttons, animated link underlines, hamburger→X morph, sliding sidebar active indicator, pop-in menus / command palette, route transitions, growing progress bars.
@@ -50,7 +88,7 @@ _Every result below was produced by actually running the command in the build sa
 - Not implemented yet: logged-in password change, email change, recovery-code regeneration, account deletion, invitations (M3).
 - UI route guard is client-side UX only; real enforcement is in the API/DB. Web CSP is not yet enforced (M8).
 - Redis connections are opened per rate-limit call (correct but not optimised).
-- `TRUSTED_PROXY_HOPS` must match deployment topology; e2e deliberately uses 2 so tests can present unique client IPs.
+- `TRUSTED_PROXY_HOPS` must match deployment topology (1 behind the Next proxy). **Correction (found in M3A):** an earlier note claimed e2e used 2 hops so tests could present unique IPs. That was wrong — Next replaces `X-Forwarded-For` with the socket peer, so all e2e traffic shares one rate-limit bucket. E2E now uses 1 hop (production-like) and a development-only `/v1/dev/reset-rate-limits` endpoint.
 - E2E in the sandbox uses an npm-distributed Chromium via `PW_CHROMIUM_PATH`; CI uses the standard Playwright browsers.
 
 ### Next: Milestone 3 (not started)

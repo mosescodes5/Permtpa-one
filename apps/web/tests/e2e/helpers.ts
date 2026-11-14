@@ -6,8 +6,11 @@ export const WEB_ORIGIN = "http://localhost:3100";
 export const PASSWORD = "correct horse battery staple";
 
 export const uniqueEmail = (p: string) => `${p}-${randomUUID().slice(0, 10)}@example.test`;
-/** A unique client IP per test (see TRUSTED_PROXY_HOPS in playwright.config.ts). */
-export const randomIp = () => { const b = randomUUID().replace(/-/g, ""); return `10.${parseInt(b.slice(0, 2), 16)}.${parseInt(b.slice(2, 4), 16)}.${(parseInt(b.slice(4, 6), 16) % 250) + 1}`; };
+/** All e2e traffic comes from localhost, so rate limits are shared; clear them (development-only endpoint) before each test. */
+export async function resetRateLimits(request: APIRequestContext) {
+  const r = await request.post(`${API}/v1/dev/reset-rate-limits`, { headers: { origin: WEB_ORIGIN } });
+  expect(r.status()).toBe(204);
+}
 
 /** Latest emailed token for an address, read from the API's development-only outbox. */
 export async function emailedToken(request: APIRequestContext, to: string): Promise<string> {

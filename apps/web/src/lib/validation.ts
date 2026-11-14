@@ -36,5 +36,8 @@ export function passwordStrength(pw: string): 0 | 1 | 2 | 3 | 4 {
 export const resetSchema = z.object({ newPassword: passwordSchema, confirm: z.string() }).refine((v) => v.newPassword === v.confirm, { message: "Passwords do not match", path: ["confirm"] });
 export type ResetInput = z.infer<typeof resetSchema>;
 
+export const inviteSchema = z.object({ email: emailSchema, role: z.string().min(1, "Choose a role") });
+export type InviteInput = z.infer<typeof inviteSchema>;
+
 export const onboardingSchema = z.object({ name: z.string().trim().min(2, "Enter your business name").max(120), businessType: z.string().min(1, "Choose a business type") });
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

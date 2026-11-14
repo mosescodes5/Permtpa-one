@@ -15,9 +15,9 @@ const apiEnv = {
   CSRF_SECRET: "e2e-only-csrf-secret-0123456789abcdef",
   MFA_ENCRYPTION_KEY: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
   PUBLIC_URL: WEB,
-  // Next appends the TCP peer to X-Forwarded-For. With 2 trusted hops the API reads the client-supplied entry,
-  // letting each test present a unique IP so per-IP rate limits do not couple unrelated tests. E2E ONLY.
-  TRUSTED_PROXY_HOPS: "2",
+  // One trusted hop = the Next proxy (same as production). Next REPLACES X-Forwarded-For with the socket peer, so every
+  // test here appears as the same client; tests call /v1/dev/reset-rate-limits (development only) instead of faking IPs.
+  TRUSTED_PROXY_HOPS: "1",
   RUST_LOG: "warn",
 };
 

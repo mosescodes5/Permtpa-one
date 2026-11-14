@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { randomIp } from "./helpers";
+import { resetRateLimits } from "./helpers";
 
-test.use({ extraHTTPHeaders: { "x-forwarded-for": randomIp() } });
+test.beforeEach(({ request }) => resetRateLimits(request));
 
 test("landing page communicates the product and brand", async ({ page }) => {
   await page.goto("/");
