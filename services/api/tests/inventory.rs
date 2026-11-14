@@ -378,3 +378,20 @@ async fn price_and_cost_changes_stock_adjustments_are_audited() {
     assert_eq!((adj.2["delta"].as_i64(), adj.2["reason"].as_str(), adj.2["resulting_on_hand"].as_i64()), (Some(-2), Some("damage"), Some(8)));
     app.db.drop().await;
 }
+
+#[tokio::test]
+#[ignore = "requires PostgreSQL + Redis"]
+async fn variants_keep_their_insertion_order() {
+    // Regression: variants created in one transaction share created_at; ordering used to fall back to random UUIDs.
+    let app = TestApp::new("development").await;
+    let org = new_org(&app, "Shop O").await;
+    let variants: Vec<Value> = (0..12).map(|i| json!({"name":format!("Size {i}"),"sku":format!("ORD-{i:02}"),"priceMinor":100})).collect();
+    for round in 0..3 {
+        let r = app.post(&format!("{}/products", base(&org)), json!({"name":format!("Shirt {round}"),"variants":variants.iter().map(|v| { let mut v = v.clone(); v["sku"] = json!(format!("{}-{round}", v["sku"].as_str().unwrap())); v }).collect::<Vec<_>>()}), org.owner.call()).await;
+        let names: Vec<String> = r.json["variants"].as_array().unwrap().iter().map(|v| v["name"].as_str().unwrap().to_owned()).collect();
+        assert_eq!(names, (0..12).map(|i| format!("Size {i}")).collect::<Vec<_>>(), "round {round}");
+        let again = app.get(&format!("{}/products/{}", base(&org), r.json["id"].as_str().unwrap()), org.owner.call()).await;
+        assert_eq!(again.json["variants"], r.json["variants"], "the same order on every read");
+    }
+    app.db.drop().await;
+}

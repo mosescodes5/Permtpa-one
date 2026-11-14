@@ -35,6 +35,7 @@ create trigger products_updated before update on products for each row execute f
 
 create table variants (
   id            uuid primary key default gen_random_uuid(),
+  seq           bigint generated always as identity,                -- stable display order (now() is identical within a transaction)
   org_id        uuid not null references organizations(id) on delete cascade,
   product_id    uuid not null,
   name          text not null default 'Default' check (length(name) between 1 and 80),

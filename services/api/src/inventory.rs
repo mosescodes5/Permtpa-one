@@ -166,7 +166,7 @@ async fn fetch_products(tx: &mut Tx, org: Uuid, f: &Filter) -> Result<(Vec<Value
     let sql = format!(
         "select p.id, p.name, p.description, p.unit, p.status, p.category_id, c.name::text,
             coalesce(json_agg(json_build_object('id', v.id, 'name', v.name, 'sku', v.sku::text, 'barcode', v.barcode, 'priceMinor', v.price_minor, 'costMinor', vc.cost_minor,
-                'reorderLevel', v.reorder_level, 'status', v.status, 'onHand', coalesce(sl.on_hand, 0)) order by v.created_at, v.id) filter (where v.id is not null), '[]'::json)::text
+                'reorderLevel', v.reorder_level, 'status', v.status, 'onHand', coalesce(sl.on_hand, 0)) order by v.seq) filter (where v.id is not null), '[]'::json)::text
          from products p
          left join categories c on c.id = p.category_id and c.org_id = p.org_id
          left join variants v on v.product_id = p.id and v.org_id = p.org_id
