@@ -195,3 +195,12 @@ export const PanelLeftOpen = mk(<><rect x="3.5" y="4.5" width="17" height="15" r
 export const Loader2 = function Loader2({ className }: IconProps) {
   return <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true" className={className}><circle cx="12" cy="12" r="9" strokeOpacity="0.2" /><path d="M21 12a9 9 0 0 0-9-9" /></svg>;
 };
+
+/* ---------- inventory additions ---------- */
+export const Plus = mk(<motion.g style={fc} variants={H({ rotate: 90, transition: spring })}><path d="M12 5v14M5 12h14" /></motion.g>);
+export const ChevronLeft = mk(<motion.path d="M15 5l-7 7 7 7" variants={H({ x: -2, transition: spring })} />);
+export const ChevronRight = mk(<motion.path d="M9 5l7 7-7 7" variants={H({ x: 2, transition: spring })} />);
+export const Archive = mk(<>
+  <rect x="3" y="3.5" width="18" height="5" rx="1.5" {...duo} /><path d="M5 8.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V8.5" />
+  <motion.path d="M9.5 13h5" variants={H({ pathLength: [0, 1], transition: { duration: 0.4 } })} /></>);
+export const Pencil = mk(<motion.g style={vb(5, 19)} variants={H({ rotate: [0, -10, 6, 0], transition: { duration: 0.5 } })}><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z" {...duo} /><path d="M14.5 6.5l3 3" /></motion.g>);

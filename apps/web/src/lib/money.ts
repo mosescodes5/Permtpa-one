@@ -38,3 +38,18 @@ export function naira(wholeNaira: number): bigint {
 export function formatMoneyWhole(minor: bigint): string {
   return formatMoney(minor).replace(/\.00$/, "");
 }
+
+/** Parse a user-typed naira amount ("1,600.50") into integer kobo WITHOUT floating-point. Returns null if invalid. */
+export function parseNairaToMinor(input: string): number | null {
+  const t = input.replace(/[,\s₦]/g, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const [whole = "0", frac = ""] = t.split(".");
+  const minor = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+  return Number.isSafeInteger(minor) && minor <= 1_000_000_000_000 ? minor : null;
+}
+
+/** Integer kobo -> "1600.50" for editing inputs. */
+export function minorToInput(minor: number): string {
+  const v = BigInt(minor);
+  return `${v / 100n}.${(v % 100n).toString().padStart(2, "0")}`;
+}

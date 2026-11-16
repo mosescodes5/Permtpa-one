@@ -56,6 +56,15 @@ export const ROLE_LABELS: Record<string, string> = { owner: "Owner", administrat
 export const ROLE_HELP: Record<string, string> = { owner: "Full control, including billing and ownership", administrator: "Manages the team and settings", manager: "Runs day-to-day operations", accountant: "Finance and reports", inventory_manager: "Products and stock", sales_staff: "Records sales", read_only: "Can view, cannot change" };
 export const ASSIGNABLE_ROLES = ["administrator", "manager", "accountant", "inventory_manager", "sales_staff", "read_only"] as const;
 
+export type Variant = { id: string; name: string; sku: string; barcode: string | null; priceMinor: number; costMinor: number | null; reorderLevel: number; status: string; onHand: number };
+export type Product = { id: string; name: string; description: string | null; unit: string; status: string; categoryId: string | null; category: string | null; variants: Variant[] };
+export type Category = { id: string; name: string; productCount: number };
+export type Movement = { id: number; delta: number; reason: string; note: string | null; resultingOnHand: number | null; actor: { id: string; name: string | null }; createdAt: string };
+export type LowStockItem = { variantId: string; productId: string; productName: string; variantName: string; sku: string; onHand: number; reorderLevel: number };
+export const REASON_LABELS: Record<string, string> = { opening: "Opening stock", purchase: "Purchase", return_in: "Customer return", adjustment: "Adjustment", damage: "Damaged / lost", correction: "Correction", sale: "Sale" };
+export const canManageInventory = (role: string) => ["owner", "administrator", "manager", "inventory_manager"].includes(role);
+export const canViewCosts = (role: string) => canManageInventory(role) || role === "accountant";
+
 export const BUSINESS_TYPES = [
   ["retail", "Retail"], ["agriculture", "Agriculture"], ["restaurant", "Restaurant"], ["distribution", "Distribution"],
   ["services", "Services"], ["agency", "Agency"], ["other", "Other"],
@@ -75,6 +84,12 @@ export function problemMessage(e: unknown): string {
     case "already_member": return "That person is already on your team.";
     case "conflict": return "That conflicts with something that already exists.";
     case "invalid_role": return "Choose a valid role.";
+    case "sku_taken": return "That SKU is already used by another item.";
+    case "barcode_taken": return "That barcode is already used by another item.";
+    case "name_taken": return "That name already exists.";
+    case "insufficient_stock": return "There is not enough stock for that change.";
+    case "note_required": return "Please explain why you are changing the stock.";
+    case "category_in_use": return "This category still has products. Move or archive them first.";
     case "unavailable": return "The service is temporarily unavailable. Please try again shortly.";
     default: return e.status >= 500 ? "Something went wrong on our side. Please try again." : e.message;
   }

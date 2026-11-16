@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 
 export const API = "http://127.0.0.1:8081";
 export const WEB_ORIGIN = "http://localhost:3100";
@@ -63,4 +63,21 @@ function base32Decode(s: string): Buffer {
 export const totp = (secretB32: string, stepOffset = 0) => hotp(base32Decode(secretB32), Math.floor(Date.now() / 30_000) + stepOffset);
 
 /** Visible alerts only (Next also renders an empty route-announcer with role=alert). */
-export const alertOf = (page: Page) => page.getByRole("alert").filter({ hasText: /\S/ });
+export const alertOf = (scope: Page | Locator) => scope.getByRole("alert").filter({ hasText: /\S/ });
+
+/** Owner (already in a workspace) invites `hireEmail` through the UI; the hire opens the emailed link, logs in and accepts. */
+export async function inviteAndJoin(owner: Page, hire: Page, request: APIRequestContext, hireEmail: string, roleValue: string) {
+  await owner.goto("/team");
+  await owner.getByLabel("Email address").fill(hireEmail);
+  await owner.getByLabel("Role", { exact: true }).selectOption(roleValue);
+  await owner.getByRole("button", { name: "Send invitation" }).click();
+  await expect(owner.getByText(`Invitation sent to ${hireEmail}`)).toBeVisible();
+  const token = await emailedToken(request, hireEmail);
+  await hire.goto(`/accept-invite?token=${token}`);
+  await expect(hire).toHaveURL(/\/login\?next=/);
+  await hire.getByLabel("Email").fill(hireEmail);
+  await hire.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await hire.getByRole("button", { name: /log in/i }).click();
+  await hire.getByRole("button", { name: "Accept invitation" }).click();
+  await hire.waitForURL(/\/dashboard$/);
+}

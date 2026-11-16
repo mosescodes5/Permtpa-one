@@ -31,3 +31,23 @@ describe("plans", () => {
     for (const p of PLANS) expect(p.annual).toBe(p.monthly * 10n);
   });
 });
+
+import { minorToInput, parseNairaToMinor } from "@/lib/money";
+describe("naira input parsing (no floating point)", () => {
+  it("parses valid amounts to exact kobo", () => {
+    expect(parseNairaToMinor("1600")).toBe(160_000);
+    expect(parseNairaToMinor("1,600.50")).toBe(160_050);
+    expect(parseNairaToMinor("₦ 0.05")).toBe(5);
+    expect(parseNairaToMinor("19.9")).toBe(1_990);
+    expect(parseNairaToMinor("0.1")).toBe(10); // the classic 0.1*100 float trap
+    expect(parseNairaToMinor("1.15")).toBe(115);
+  });
+  it("rejects anything ambiguous or out of range", () => {
+    for (const bad of ["", "abc", "-5", "1.234", "1..2", "1e5", "10000000000.01", "99999999999999999999"]) expect(parseNairaToMinor(bad), bad).toBeNull();
+    expect(parseNairaToMinor("10000000000")).toBe(1_000_000_000_000);
+  });
+  it("round-trips for editing", () => {
+    for (const m of [0, 5, 99, 100, 160_050, 1_000_000_000_000]) expect(parseNairaToMinor(minorToInput(m))).toBe(m);
+    expect(minorToInput(5)).toBe("0.05");
+  });
+});

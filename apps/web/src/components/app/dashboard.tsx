@@ -1,12 +1,14 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Info } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney } from "@/lib/money";
 import { MoneyCountUp } from "@/components/count-up";
-import { LOW_STOCK, RECENT, REVENUE_SERIES, TOP_PRODUCTS, sumSeries, type Range } from "@/lib/sample-data";
+import { RECENT, REVENUE_SERIES, TOP_PRODUCTS, sumSeries, type Range } from "@/lib/sample-data";
+import { api, type LowStockItem } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
 
@@ -29,6 +31,14 @@ function Kpi({ label, amount, delta, up, note, i }: { label: string; amount: num
 export function Dashboard() {
   const { me, activeOrg } = useAuth();
   const [range, setRange] = useState<Range>("30d");
+  const [lowStock, setLowStock] = useState<LowStockItem[] | null>(null);
+  const orgId = activeOrg?.orgId;
+  useEffect(() => {
+    let alive = true;
+    if (!orgId) return;
+    api<{ items: LowStockItem[] }>(`/v1/orgs/${orgId}/inventory/low-stock`).then((r) => { if (alive) setLowStock(r.items); }).catch(() => { if (alive) setLowStock([]); });
+    return () => { alive = false; };
+  }, [orgId]);
   const data = REVENUE_SERIES[range];
   const totals = useMemo(() => sumSeries(range), [range]);
   const expenses = Math.round(totals.revenue * 0.18);
@@ -74,13 +84,15 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Low-stock alerts</CardTitle><Badge tone="warning"><AlertTriangle className="size-3" />{LOW_STOCK.length} items</Badge></CardHeader>
+          <CardHeader><div><CardTitle>Low-stock alerts</CardTitle><p className="mt-1 text-xs text-subtle">Live from your inventory</p></div>{lowStock && lowStock.length > 0 && <Badge tone="warning"><AlertTriangle className="size-3" />{lowStock.length} {lowStock.length === 1 ? "item" : "items"}</Badge>}</CardHeader>
           <CardContent className="space-y-5">
-            {LOW_STOCK.map((p) => (
-              <div key={p.name}>
-                <div className="flex items-baseline justify-between text-sm"><span className="font-medium">{p.name}</span><span className="tabular text-muted">{p.left} left</span></div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-subtle" role="progressbar" aria-valuenow={p.left} aria-valuemin={0} aria-valuemax={p.reorder} aria-label={`${p.name} stock level`}><div className="animate-grow-x h-full rounded-full bg-warning" style={{ width: `${Math.min(100, (p.left / p.reorder) * 100)}%` }} /></div>
-                <p className="mt-1 text-[11px] text-subtle">Reorder at {p.reorder}</p>
+            {lowStock === null && <div className="skeleton h-20 w-full" />}
+            {lowStock?.length === 0 && <p className="py-6 text-center text-sm text-muted">Nothing is running low. <Link href="/inventory" className="font-medium text-accent hover:underline">Manage inventory</Link></p>}
+            {lowStock?.slice(0, 5).map((p) => (
+              <div key={p.variantId}>
+                <div className="flex items-baseline justify-between text-sm"><span className="font-medium">{p.productName}{p.variantName !== "Default" && ` · ${p.variantName}`}</span><span className="tabular text-muted">{p.onHand} left</span></div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-subtle" role="progressbar" aria-valuenow={p.onHand} aria-valuemin={0} aria-valuemax={p.reorderLevel} aria-label={`${p.productName} stock level`}><div className="animate-grow-x h-full rounded-full bg-warning" style={{ width: `${Math.min(100, (p.onHand / p.reorderLevel) * 100)}%` }} /></div>
+                <p className="mt-1 text-[11px] text-subtle">Reorder at {p.reorderLevel}</p>
               </div>
             ))}
           </CardContent>
@@ -90,7 +102,7 @@ export function Dashboard() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Top products</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto pt-3">
+          <CardContent className="relative overflow-x-auto pt-3">
             <table className="w-full text-sm"><caption className="sr-only">Top products by revenue</caption>
               <thead><tr className="text-left text-xs text-subtle"><th className="pb-2 font-medium">Product</th><th className="pb-2 text-right font-medium">Units</th><th className="pb-2 text-right font-medium">Revenue</th></tr></thead>
               <tbody className="divide-y divide-border">{TOP_PRODUCTS.map((p) => <tr key={p.sku} className="transition-colors hover:bg-bg-subtle"><td className="py-3"><p className="font-medium">{p.name}</p><p className="font-mono text-[11px] text-subtle">{p.sku}</p></td><td className="tabular py-3 text-right text-muted">{p.units}</td><td className="tabular py-3 text-right font-medium">{formatMoney(p.revenue, "NGN", { compact: true })}</td></tr>)}</tbody>
@@ -99,7 +111,7 @@ export function Dashboard() {
         </Card>
         <Card>
           <CardHeader><CardTitle>Recent transactions</CardTitle></CardHeader>
-          <CardContent className="overflow-x-auto pt-3">
+          <CardContent className="relative overflow-x-auto pt-3">
             <table className="w-full text-sm"><caption className="sr-only">Recent transactions</caption>
               <thead><tr className="text-left text-xs text-subtle"><th className="pb-2 font-medium">Sale</th><th className="pb-2 font-medium">Status</th><th className="pb-2 text-right font-medium">Amount</th></tr></thead>
               <tbody className="divide-y divide-border">{RECENT.map((t) => <tr key={t.id} className="transition-colors hover:bg-bg-subtle"><td className="py-3"><p className="font-medium">{t.customer}</p><p className="text-[11px] text-subtle">{t.id} · {t.method} · {t.time}</p></td><td className="py-3"><Badge tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Badge></td><td className="tabular py-3 text-right font-medium">{formatMoney(t.amount)}</td></tr>)}</tbody>
