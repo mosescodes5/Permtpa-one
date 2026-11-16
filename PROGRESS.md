@@ -2,6 +2,49 @@
 
 _Every result below was produced by actually running the command in the build sandbox (Ubuntu 24.04). Nothing here was run in Docker — see Known issues._
 
+## Milestone 3 · Part B — Inventory: **COMPLETE (verified in sandbox)**
+Milestone 3 is now complete (3A teams + 3B inventory). Built for a **retail shop** with **whole-number quantities** (an assumption — no business type was chosen).
+
+### Delivered
+- **DB (migration 0008):** categories, products, variants (SKU/barcode unique *per organization*), variant costs (separate table so RLS can hide them), `stock_levels` (read-only to the app) and append-only `stock_movements`. A trigger is the only way a balance changes: it locks the row, refuses negative stock and records the balance after each movement. Composite foreign keys make cross-tenant references impossible. Cost prices are invisible to Sales Staff and Read Only *at the database level*. Audit triggers for product/variant/cost/price changes and stock adjustments.
+- **API:** categories, products (with variants, costs and opening stock in one transaction), variant edits, stock adjustments (reason + note rules, sign rules, `insufficient_stock` → 409), movement history (keyset pagination), barcode/SKU lookup, low-stock list, valuation (exact `NUMERIC` arithmetic, returned as a string). Search with escaped wildcards, capped pagination, archive instead of delete. Domain crate gained `can_manage_inventory` / `can_view_costs` with a **drift-guard test** that parses the SQL role lists.
+- **Web:** Inventory page (KPIs, search, category and status filters, pagination, stock badges), dialogs for add product / adjust stock / history / edit prices / categories, exact naira parsing (no floats), live low-stock card on the dashboard, role-aware UI.
+
+### Verification (final fresh run)
+| Check | Result |
+|---|---|
+| ESLint / tsc | 0 problems / clean |
+| Vitest | **35 passed** |
+| `cargo test --workspace` (non-DB) | **30 passed** |
+| DB-backed Rust: auth / team / **inventory** / tenancy / smtp | **13 / 9 / 12 / 3 / 2 passed** |
+| SQL adversarial suite | **126 passed, 0 failed** (43 new inventory assertions) |
+| Full-stack Playwright (desktop + mobile) | **29 passed, 7 skipped, 0 failed** |
+| `npm audit --omit=dev` | 0 vulnerabilities |
+| Mutation tests — inventory SQL | **14/14 caught** |
+| Mutation tests — inventory API | **15/15 caught** (after fixing one weak test, below) |
+| Concurrency | 25 simultaneous withdrawals against 10 units → exactly 10 succeed, final balance 0, history sum = balance |
+| Valuation exactness | 10^12 × 10^8 = 10^20 (beyond 64-bit) returned exactly |
+Visually reviewed: inventory page (dark), adjust-stock dialog; stock value ₦972K matched a hand calculation.
+
+### Defects found and fixed this round (for honesty)
+1. **Variant order was random** (variants created in one transaction share `now()`; ties were broken by random UUID). Caught by a flaky run; fixed with an identity `seq` column; a regression test is proven to fail on the old code.
+2. **Weak test found by mutation testing:** the page-size cap was only checked via the *echoed* number. Limit is now single-sourced and the test loads 113 rows and checks only 100 return.
+3. **Mobile layout bug:** screen-reader-only text (`position:absolute`) inside a scrolling table escaped its clip and stretched the page to 675px on a 412px phone. All scroll containers are now positioned. The first mobile "pass" was a **false pass** (the test measured a loading skeleton); the test now waits for real content and is proven to fail when the bug is re-introduced.
+4. **Process errors:** the sandbox disk filled to 100% (linker failed — cleared build caches); a mutation run exceeded the time limit and left a source file mutated (detected and restored; runs are now batched, gated and restore-verified).
+
+### Known issues / limitations
+- Quantities are whole numbers only (no kg/litre decimals); no expiry dates, batches, serial numbers, multiple locations or stock transfers.
+- Valuation = current cost × on-hand (not FIFO/weighted-average). Changing a cost reprices all stock.
+- UI gaps (API exists): editing product name/category, adding a variant to an existing product, bulk import, camera barcode scanning.
+- Concurrency was tested with parallel requests in one API process, not across multiple API instances (the row lock is in the database, so it should hold, but this is untested).
+- Purchase orders and suppliers belong to Milestone 4; the `sale` movement reason is reserved for the sales module.
+- Windows, Docker, `clippy`, `cargo audit`/`deny` remain unverified in this sandbox.
+
+### Next: Milestone 4 — Sales / POS, customers, suppliers
+Sales with multiple lines, discounts, tax, payment methods, receipts, refunds/returns (stock-consistent via the reserved `sale`/`return_in` movements), customers with balances, suppliers and purchase orders.
+
+---
+
 ## Milestone 3 · Part A — Teams & organizations: **COMPLETE (verified in sandbox)**
 Part B (products / inventory) is **not started**.
 

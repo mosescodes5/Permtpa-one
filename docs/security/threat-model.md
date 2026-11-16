@@ -41,6 +41,17 @@ This is a living document. "Tested by" names the automated test that fails if th
 | Untraceable changes | DB triggers write audit rows with the real actor; no tokens in metadata | `team_changes_are_audited…`, SQL suite |
 Defence in depth is deliberate: removing the API role check alone changes nothing (the database still refuses); only removing both is detected by the tests.
 
+## Inventory (Milestone 3B)
+| Threat | Control | Tested by |
+|---|---|---|
+| Cross-tenant product/stock access | Composite `(org_id, id)` keys + RLS + 404s | SQL suite, `cross_tenant_inventory_attacks_all_return_404` |
+| Staff reading cost prices (financial data) | Costs in a separate RLS-protected table; role lists mirrored and drift-tested in Rust | `role_matrix_over_http`, domain drift guard, SQL suite |
+| Stock tampering / silent edits | Balances only change through an append-only movement trigger; app role cannot write `stock_levels`; no UPDATE/DELETE/TRUNCATE on history | SQL suite (mutation-tested) |
+| Overselling under concurrency | Row lock in the trigger; negative stock refused | `concurrent_withdrawals_never_oversell` |
+| Unexplained adjustments | Reason + note required; audit row with real actor and before/after | `stock_movements_history_and_rules`, `…are_audited` |
+| Injection via search | Parameterised SQL + LIKE-wildcard escaping | `search_pagination_and_category_rules` |
+| Money overflow / float error | Integer kobo; valuation in `NUMERIC` returned as a string | `valuation_is_exact_beyond_64_bit_range`, naira parsing unit tests |
+
 ## Residual risks / not yet done
 - Client IP trust depends on `TRUSTED_PROXY_HOPS` matching the real topology; wrong values either collapse all users into one rate-limit bucket or let attackers spoof IPs.
 - No breached-password corpus check (only a tiny deny-list); no CAPTCHA/bot scoring; account lockout can be used to temporarily deny a victim (capped at 60 min).

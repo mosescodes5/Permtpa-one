@@ -16,6 +16,9 @@ Required: `CSRF_SECRET` (≥32 chars) and `MFA_ENCRYPTION_KEY` (base64, 32 bytes
 The browser talks only to Next (`/api/*` is proxied to the API via `API_INTERNAL_URL`), so cookies are first-party. Set `TRUSTED_PROXY_HOPS=1` when the API sits behind that proxy.
 In development, emails are captured in memory and readable at `GET /v1/dev/outbox` (that route does not exist in staging/production). Set `SMTP_URL` to deliver for real (TLS required outside development).
 
+## Tips for slow / small machines
+`cargo` debug builds are large (several GB). If the linker fails with no obvious error, check free disk space. `CARGO_INCREMENTAL=0` and deleting `target/debug/incremental` save space.
+
 ## Windows
 Rust, PostgreSQL and Redis must be installed (or use WSL / Docker). Run `scripts/*.sh` from **Git Bash** or WSL. The e2e config starts the API with `cargo run`, which works on every OS. Only Linux has been tested by the author.
 
