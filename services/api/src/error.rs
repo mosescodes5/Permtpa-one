@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    http::{StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
@@ -110,13 +110,11 @@ impl IntoResponse for ApiError {
         let mut res = (status, Json(json!({ "type": "about:blank", "title": title, "status": status.as_u16(), "code": code, "detail": detail }))).into_response();
         res.headers_mut().insert(
             header::CONTENT_TYPE,
-            "application/problem+json".parse().expect("static header"),
+            HeaderValue::from_static("application/problem+json"),
         );
         if let Some(s) = retry {
-            res.headers_mut().insert(
-                header::RETRY_AFTER,
-                s.to_string().parse().expect("numeric header"),
-            );
+            res.headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(s));
         }
         res
     }

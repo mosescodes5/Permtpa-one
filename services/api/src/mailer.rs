@@ -13,6 +13,7 @@ pub struct Email {
 /// * `Capture` — in-memory outbox for tests and local development.
 /// * `Disabled` — refuses to send, so a misconfigured environment fails loudly instead of pretending.
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)] // a single long-lived instance lives in app state
 pub enum Mailer {
     Smtp {
         transport: AsyncSmtpTransport<Tokio1Executor>,

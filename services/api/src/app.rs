@@ -31,6 +31,9 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Runs once at startup. Hashing a fixed string only fails if the OS cannot supply randomness,
+    /// in which case refusing to start is the correct behaviour.
+    #[allow(clippy::expect_used)]
     pub fn new(pool: PgPool, redis: Arc<redis::Client>, cfg: Config, mailer: Mailer) -> Self {
         let dummy_hash = Arc::new(
             security::hash_password("dummy-password-for-timing-equalisation")

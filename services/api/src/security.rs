@@ -58,6 +58,7 @@ pub fn verify_password(phc: &str, password: &str) -> bool {
 
 // ---- CSRF: token bound to the session (HMAC of the session token hash) ----
 pub fn csrf_token(secret: &[u8; 32], session_token_hash: &[u8; 32]) -> String {
+    #[allow(clippy::expect_used)] // HMAC accepts keys of any length, so this cannot fail
     let mut mac = <Hmac<Sha256> as hmac::KeyInit>::new_from_slice(secret)
         .expect("hmac accepts any key length");
     mac.update(b"permtpa-one:csrf:v1:");
@@ -67,6 +68,7 @@ pub fn csrf_token(secret: &[u8; 32], session_token_hash: &[u8; 32]) -> String {
 
 // ---- TOTP (RFC 6238, HMAC-SHA1, 6 digits, 30 s) ----
 pub fn hotp(secret: &[u8], counter: u64) -> u32 {
+    #[allow(clippy::expect_used)] // HMAC accepts keys of any length, so this cannot fail
     let mut mac = <Hmac<sha1::Sha1> as hmac::KeyInit>::new_from_slice(secret)
         .expect("hmac accepts any key length");
     mac.update(&counter.to_be_bytes());
