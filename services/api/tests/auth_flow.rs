@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! HTTP-level authentication, session, CSRF, MFA and tenancy tests against real PostgreSQL + Redis.
 //!   TEST_ADMIN_DATABASE_URL=postgres://postgres:pw@127.0.0.1:5432/postgres cargo test -p permtpa-api --test auth_flow -- --ignored
 mod common;

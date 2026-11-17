@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests that exercise tenant isolation through the REAL Rust code path (`begin_tenant_tx`)
 //! against a real PostgreSQL. Run with:
 //!   TEST_ADMIN_DATABASE_URL=postgres://postgres:pw@127.0.0.1:5432/postgres cargo test -p permtpa-api -- --ignored

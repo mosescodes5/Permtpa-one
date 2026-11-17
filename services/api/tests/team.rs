@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Team management over HTTP against real PostgreSQL + Redis.
 mod common;
 use axum::http::StatusCode;

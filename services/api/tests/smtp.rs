@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Real SMTP delivery against a local sink (scripts/smtp-sink.py).
 //!   python3 scripts/smtp-sink.py 1025 /tmp/smtp-sink.log &
 //!   TEST_SMTP_URL=smtp://127.0.0.1:1025 TEST_SMTP_LOG=/tmp/smtp-sink.log cargo test -p permtpa-api --test smtp -- --ignored

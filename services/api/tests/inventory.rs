@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Inventory over HTTP against real PostgreSQL + Redis.
 mod common;
 use axum::http::StatusCode;
@@ -755,7 +756,7 @@ async fn archive_lookup_low_stock_and_valuation() {
         (Some("RIC-1"), Some(7_000))
     );
 
-    // exact arithmetic: 7×1_200_000 + 100×50 = 8_405_000; one stocked variant has no cost
+    // exact arithmetic: 7Ã—1_200_000 + 100Ã—50 = 8_405_000; one stocked variant has no cost
     let val = app
         .get(&format!("{b}/inventory/valuation"), org.owner.call())
         .await;
@@ -906,7 +907,7 @@ async fn valuation_is_exact_beyond_64_bit_range() {
         .await;
     assert_eq!(
         val.json["totalMinor"], "100000000000000000000",
-        "10^12 × 10^8 = 10^20 exceeds i64 yet must be exact"
+        "10^12 Ã— 10^8 = 10^20 exceeds i64 yet must be exact"
     );
     app.db.drop().await;
 }

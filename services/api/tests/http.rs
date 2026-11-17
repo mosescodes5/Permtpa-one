@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -12,7 +13,7 @@ use sqlx::postgres::PgPoolOptions;
 use std::{sync::Arc, time::Duration};
 use tower::ServiceExt;
 
-/// State pointing at services that do not exist (port 1) — proves liveness is dependency-free
+/// State pointing at services that do not exist (port 1) â€” proves liveness is dependency-free
 /// and readiness fails closed without leaking connection details.
 fn dead_state() -> AppState {
     let pool = PgPoolOptions::new()
