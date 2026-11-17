@@ -46,6 +46,7 @@ jobs:
       - run: cargo test -p permtpa-api -- --ignored --test-threads=4
         env: { TEST_SMTP_URL: "smtp://127.0.0.1:1025", TEST_SMTP_LOG: /tmp/smtp-sink.log }
       - run: ./scripts/test-db.sh
+      - run: ./scripts/test-0009-upgrade.sh
       - run: cargo install cargo-audit cargo-deny --locked
       - run: cargo audit
       - run: cargo deny check

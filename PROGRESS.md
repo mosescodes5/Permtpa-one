@@ -1,6 +1,25 @@
 # PROGRESS LOG — PERMTPA ONE
 
-_Every result below was produced by actually running the command in the build sandbox (Ubuntu 24.04). Nothing here was run in Docker — see Known issues._
+## Milestone 4 · Step 1 — Fractional quantities: **WRITTEN, NOT VERIFIED**
+Authored in a sandbox with no Rust, PostgreSQL, Redis or network. **Nothing below has been compiled or run.** The developer verifies in VS Code / CI (`.github/workflows/ci.yml`, plus the new `scripts/test-0009-upgrade.sh` step).
+The Milestone 3 baseline (Vitest 35, Rust 30, DB 13/9/12/3/2, SQL 126, Playwright 29+7 skipped) was NOT re-verified; treat as unverified claims.
+
+### Changes
+- **Migration 0009** (`services/api/migrations/0009_fractional_quantities.sql`): your draft plus (a) a `qty_scale: 1000` marker on new `stock.adjust` audit rows (rows written before 0009 have no marker and hold whole-unit deltas); (b) `allow_fractional` is settable only at INSERT, never UPDATE (column grant unchanged).
+- **API** (`src/inventory.rs`, `src/team.rs`): quantities `i64` thousandths, `MAX_QTY` 100_000_000_000; `allowFractional` on product create and in responses; whole-unit products reject fractional opening stock / reorder level in the API (`fractional_not_allowed`) and fractional movements in the DB trigger (mapped to the same 400); valuation = round(Σ on_hand×cost ÷ 1000) once, half away from zero; response key `units` renamed `unitsThousandths`; `i64::MIN` delta no longer overflows `abs()`.
+- **Rust tests** (`tests/inventory.rs`): existing references rescaled; new tests for exact 2.5 kg arithmetic, valuation rounding (1.750 kg × 1001 = 1752), whole-unit refusals on every entry path, `allowFractional` not updatable, 25-way concurrent 0.4 kg withdrawals on 2.0 kg (expect exactly 5). Unit tests added for `whole_unit_ok` and bounds.
+- **SQL attack suite** (`tests/db/rls_attacks.sql`): existing assertions rescaled (the `sale`-reserved test now uses a whole-unit delta so it cannot pass for the wrong reason); new attacks: fractional accepted/exact on fractional product, whole-unit product rejects +0.5/+1.5/-0.001, app role cannot flip `allow_fractional` either way, delta/reorder caps, cross-tenant fractional movement, audit scale marker.
+- **Upgrade test** (`scripts/test-0009-upgrade.sh`, `tests/db/upgrade_0009_*.sql`): migrates to 0008, seeds whole-unit data, applies 0009, asserts balances, reorder levels, deltas and resulting balances were multiplied by 1000 and the old audit row is untouched.
+- **Web**: `src/lib/quantity.ts` (string-based parse/format, no floats) with `tests/unit/quantity.test.ts`; add-product form has an "allows decimals" checkbox; stock, history, edit, inventory KPI and dashboard use it; e2e seed values rescaled.
+
+### NOT verified (all of it)
+cargo build/test/clippy/fmt, SQLx compile-time checks, migration 0009 on a real database (constraint names assume Postgres defaults), SQL suite, upgrade test, Vitest/ESLint/tsc, Playwright, Docker, cargo audit/deny, real SMTP, Windows. **Mutation checks of the new controls have not been run**; do them after CI is green (drop the trigger's `% 1000` check, grant UPDATE(allow_fractional), remove the API whole-unit check, and confirm the matching tests fail).
+Also unconfirmed: any other code that reads quantity columns as i32 (grep `i32` and `on_hand` across `services/api/src` besides inventory.rs).
+
+### Next
+Step 2: business-type onboarding with a deletable sample catalogue.
+
+---
 
 ## Milestone 3 · Part B — Inventory: **COMPLETE (verified in sandbox)**
 Milestone 3 is now complete (3A teams + 3B inventory). Built for a **retail shop** with **whole-number quantities** (an assumption — no business type was chosen).

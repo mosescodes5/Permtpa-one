@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { formatQty } from "@/lib/quantity";
 import Link from "next/link";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, Info } from "@/components/icons";
@@ -90,9 +91,9 @@ export function Dashboard() {
             {lowStock?.length === 0 && <p className="py-6 text-center text-sm text-muted">Nothing is running low. <Link href="/inventory" className="font-medium text-accent hover:underline">Manage inventory</Link></p>}
             {lowStock?.slice(0, 5).map((p) => (
               <div key={p.variantId}>
-                <div className="flex items-baseline justify-between text-sm"><span className="font-medium">{p.productName}{p.variantName !== "Default" && ` · ${p.variantName}`}</span><span className="tabular text-muted">{p.onHand} left</span></div>
+                <div className="flex items-baseline justify-between text-sm"><span className="font-medium">{p.productName}{p.variantName !== "Default" && ` · ${p.variantName}`}</span><span className="tabular text-muted">{formatQty(p.onHand)} left</span></div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-subtle" role="progressbar" aria-valuenow={p.onHand} aria-valuemin={0} aria-valuemax={p.reorderLevel} aria-label={`${p.productName} stock level`}><div className="animate-grow-x h-full rounded-full bg-warning" style={{ width: `${Math.min(100, (p.onHand / p.reorderLevel) * 100)}%` }} /></div>
-                <p className="mt-1 text-[11px] text-subtle">Reorder at {p.reorderLevel}</p>
+                <p className="mt-1 text-[11px] text-subtle">Reorder at {formatQty(p.reorderLevel)}</p>
               </div>
             ))}
           </CardContent>

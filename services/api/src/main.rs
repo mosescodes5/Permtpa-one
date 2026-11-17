@@ -1,4 +1,9 @@
-use permtpa_api::{app, config::{Config, Environment}, db, mailer::Mailer};
+use permtpa_api::{
+    app,
+    config::{Config, Environment},
+    db,
+    mailer::Mailer,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing_subscriber::{EnvFilter, fmt};
@@ -6,7 +11,8 @@ use tracing_subscriber::{EnvFilter, fmt};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = Config::from_env()?;
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,tower_http=info"));
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,tower_http=info"));
     if cfg.environment == Environment::Development {
         fmt().with_env_filter(filter).init();
     } else {
@@ -16,7 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // `permtpa-api migrate` applies migrations using the dedicated migrator role, then exits.
     if std::env::args().nth(1).as_deref() == Some("migrate") {
-        let url = cfg.migrator_database_url.as_deref().ok_or("MIGRATOR_DATABASE_URL is required for `migrate`")?;
+        let url = cfg
+            .migrator_database_url
+            .as_deref()
+            .ok_or("MIGRATOR_DATABASE_URL is required for `migrate`")?;
         let pool = db::connect(url, 1).await?;
         db::MIGRATOR.run(&pool).await?;
         tracing::info!("migrations applied");
@@ -40,16 +49,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind(cfg.bind).await?;
     tracing::info!(addr = %cfg.bind, "listening");
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).with_graceful_shutdown(shutdown_signal()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
     tracing::info!("shutdown complete");
     Ok(())
 }
 
 async fn shutdown_signal() {
-    let ctrl_c = async { let _ = tokio::signal::ctrl_c().await; };
+    let ctrl_c = async {
+        let _ = tokio::signal::ctrl_c().await;
+    };
     #[cfg(unix)]
     let term = async {
-        if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+        if let Ok(mut s) = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
             s.recv().await;
         }
     };

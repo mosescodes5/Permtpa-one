@@ -57,7 +57,7 @@ export const ROLE_HELP: Record<string, string> = { owner: "Full control, includi
 export const ASSIGNABLE_ROLES = ["administrator", "manager", "accountant", "inventory_manager", "sales_staff", "read_only"] as const;
 
 export type Variant = { id: string; name: string; sku: string; barcode: string | null; priceMinor: number; costMinor: number | null; reorderLevel: number; status: string; onHand: number };
-export type Product = { id: string; name: string; description: string | null; unit: string; status: string; categoryId: string | null; category: string | null; variants: Variant[] };
+export type Product = { id: string; name: string; description: string | null; unit: string; allowFractional: boolean; status: string; categoryId: string | null; category: string | null; variants: Variant[] };
 export type Category = { id: string; name: string; productCount: number };
 export type Movement = { id: number; delta: number; reason: string; note: string | null; resultingOnHand: number | null; actor: { id: string; name: string | null }; createdAt: string };
 export type LowStockItem = { variantId: string; productId: string; productName: string; variantName: string; sku: string; onHand: number; reorderLevel: number };

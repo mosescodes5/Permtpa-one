@@ -8,18 +8,18 @@ import { Modal } from "@/components/ui/modal";
 import { Banner } from "@/components/auth/forms";
 import { REASON_LABELS, api, problemMessage, type Category, type Movement, type Product, type Variant } from "@/lib/api";
 import { formatMoney, minorToInput, parseNairaToMinor } from "@/lib/money";
+import { formatQty, parseQty, qtyToInput } from "@/lib/quantity";
 
 const selectCls = "h-11 w-full cursor-pointer rounded-lg border border-border-strong bg-surface px-3 text-sm shadow-sm focus-visible:border-accent focus-visible:outline-none";
 const SKU_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
 const BARCODE_RE = /^[0-9A-Za-z-]{4,32}$/;
-const intOrNull = (s: string) => (/^\d{1,9}$/.test(s.trim()) ? Number(s.trim()) : null);
 
 // ---------------------------------------------------------------- add product
 type Row = { name: string; sku: string; barcode: string; price: string; cost: string; reorder: string; opening: string };
 const emptyRow = (): Row => ({ name: "", sku: "", barcode: "", price: "", cost: "", reorder: "0", opening: "0" });
 
 export function ProductForm({ open, onClose, orgId, categories, onSaved }: { open: boolean; onClose: () => void; orgId: string; categories: Category[]; onSaved: (msg: string) => void }) {
-  const [name, setName] = useState(""); const [unit, setUnit] = useState("pcs"); const [category, setCategory] = useState(""); const [description, setDescription] = useState("");
+  const [name, setName] = useState(""); const [unit, setUnit] = useState("pcs"); const [category, setCategory] = useState(""); const [description, setDescription] = useState(""); const [fractional, setFractional] = useState(false);
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [errors, setErrors] = useState<string[]>([]); const [busy, setBusy] = useState(false); const [apiError, setApiError] = useState<string | null>(null);
   const set = (i: number, k: keyof Row, v: string) => setRows((r) => r.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -30,19 +30,19 @@ export function ProductForm({ open, onClose, orgId, categories, onSaved }: { ope
     if (name.trim().length < 1) errs.push("Enter a product name.");
     const variants = rows.map((r, i) => {
       const n = i + 1; const price = parseNairaToMinor(r.price); const cost = r.cost.trim() ? parseNairaToMinor(r.cost) : undefined;
-      const reorder = intOrNull(r.reorder); const opening = intOrNull(r.opening);
+      const reorder = parseQty(r.reorder, fractional); const opening = parseQty(r.opening, fractional);
       if (!SKU_RE.test(r.sku.trim())) errs.push(`Variant ${n}: SKU needs letters/digits (and . _ -), up to 40 characters.`);
       if (price === null) errs.push(`Variant ${n}: enter a valid selling price (e.g. 1,600.50).`);
       if (cost === null) errs.push(`Variant ${n}: cost price is not a valid amount.`);
       if (r.barcode.trim() && !BARCODE_RE.test(r.barcode.trim())) errs.push(`Variant ${n}: barcode must be 4–32 letters, digits or "-".`);
-      if (reorder === null || opening === null) errs.push(`Variant ${n}: reorder level and opening stock must be whole numbers.`);
+      if (reorder === null || opening === null) errs.push(`Variant ${n}: reorder level and opening stock must be ${fractional ? "numbers with up to 3 decimals" : "whole numbers"}.`);
       return { ...(r.name.trim() ? { name: r.name.trim() } : {}), sku: r.sku.trim(), ...(r.barcode.trim() ? { barcode: r.barcode.trim() } : {}), priceMinor: price ?? 0, ...(cost != null ? { costMinor: cost } : {}), reorderLevel: reorder ?? 0, openingStock: opening ?? 0 };
     });
     setErrors(errs); if (errs.length) return;
     setBusy(true);
     try {
-      await api(`/v1/orgs/${orgId}/products`, { method: "POST", body: { name: name.trim(), unit: unit.trim() || "pcs", ...(description.trim() ? { description: description.trim() } : {}), ...(category ? { categoryId: category } : {}), variants } });
-      setName(""); setRows([emptyRow()]); setDescription(""); setCategory(""); onSaved(`${name.trim()} was added.`); onClose();
+      await api(`/v1/orgs/${orgId}/products`, { method: "POST", body: { name: name.trim(), unit: unit.trim() || "pcs", allowFractional: fractional, ...(description.trim() ? { description: description.trim() } : {}), ...(category ? { categoryId: category } : {}), variants } });
+      setName(""); setRows([emptyRow()]); setDescription(""); setCategory(""); setFractional(false); onSaved(`${name.trim()} was added.`); onClose();
     } catch (x) { setApiError(problemMessage(x)); } finally { setBusy(false); }
   }
 
@@ -55,6 +55,7 @@ export function ProductForm({ open, onClose, orgId, categories, onSaved }: { ope
           <div className="sm:col-span-2"><Label htmlFor="p-name">Product name</Label><Input id="p-name" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div><Label htmlFor="p-cat">Category</Label><select id="p-cat" className={selectCls} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">None</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
           <div><Label htmlFor="p-unit">Unit</Label><Input id="p-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs, bag, carton…" /></div>
+          <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2"><input id="p-frac" type="checkbox" className="mt-0.5 size-4 accent-[var(--accent)]" checked={fractional} onChange={(e) => setFractional(e.target.checked)} /><span><span className="font-medium">Sold by weight or volume (allows decimals, e.g. 2.5 kg)</span><span className="block text-xs text-subtle">Cannot be changed after the product is created.</span></span></label>
           <div className="sm:col-span-2"><Label htmlFor="p-desc">Description (optional)</Label><Input id="p-desc" value={description} onChange={(e) => setDescription(e.target.value)} /></div>
         </div>
         <div className="space-y-3">
@@ -99,30 +100,30 @@ function StockForm({ target, orgId, onClose, onSaved }: { target: { product: Pro
   const [quantity, setQuantity] = useState(""); const [note, setNote] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   const v = target.variant;
   const signed = reason === "purchase" || reason === "return_in" ? 1 : reason === "damage" ? -1 : direction === "add" ? 1 : -1;
-  const qty = intOrNull(quantity); const delta = qty && qty > 0 ? signed * qty : null;
+  const fractional = target.product.allowFractional; const qty = parseQty(quantity, fractional); const delta = qty && qty > 0 ? signed * qty : null;
   const noteRequired = reason === "adjustment" || reason === "damage" || reason === "correction";
   const after = v && delta !== null ? v.onHand + delta : null;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
-    if (delta === null) { setError("Enter a whole-number quantity greater than zero."); return; }
+    if (delta === null) { setError(fractional ? "Enter a quantity greater than zero (up to 3 decimals)." : "Enter a whole-number quantity greater than zero."); return; }
     if (noteRequired && !note.trim()) { setError("Please explain why you are changing the stock."); return; }
     if (after !== null && after < 0) { setError("That would take stock below zero."); return; }
     setBusy(true);
-    try { await api(`/v1/orgs/${orgId}/variants/${v.id}/stock`, { method: "POST", body: { delta, reason, ...(note.trim() ? { note: note.trim() } : {}) } }); setQuantity(""); setNote(""); onSaved(`${target.product.name} stock is now ${after}.`); onClose(); }
+    try { await api(`/v1/orgs/${orgId}/variants/${v.id}/stock`, { method: "POST", body: { delta, reason, ...(note.trim() ? { note: note.trim() } : {}) } }); setQuantity(""); setNote(""); onSaved(`${target.product.name} stock is now ${formatQty(after ?? 0)}.`); onClose(); }
     catch (x) { setError(problemMessage(x)); } finally { setBusy(false); }
   }
   return (
     <>
       {(
         <form noValidate onSubmit={submit} className="space-y-4">
-          <div className="rounded-lg bg-bg-subtle p-3 text-sm"><p className="font-medium">{target.product.name}{v.name !== "Default" && ` · ${v.name}`}</p><p className="text-xs text-subtle">{v.sku} · currently <strong className="text-fg">{v.onHand}</strong> {target.product.unit}</p></div>
+          <div className="rounded-lg bg-bg-subtle p-3 text-sm"><p className="font-medium">{target.product.name}{v.name !== "Default" && ` · ${v.name}`}</p><p className="text-xs text-subtle">{v.sku} · currently <strong className="text-fg">{formatQty(v.onHand)}</strong> {target.product.unit}</p></div>
           {error && <Banner tone="error">{error}</Banner>}
           <div><Label htmlFor="s-reason">Reason</Label><select id="s-reason" className={selectCls} value={reason} onChange={(e) => setReason(e.target.value as (typeof REASONS)[number])}>{REASONS.map((r) => <option key={r} value={r}>{REASON_LABELS[r]}</option>)}</select></div>
           {(reason === "adjustment" || reason === "correction") && (
             <div role="radiogroup" aria-label="Direction" className="flex gap-2">{(["add", "remove"] as const).map((d) => <button key={d} type="button" role="radio" aria-checked={direction === d} onClick={() => setDirection(d)} className={`flex-1 cursor-pointer rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${direction === d ? "border-accent bg-accent-soft text-accent" : "border-border-strong text-muted hover:bg-bg-subtle"}`}>{d === "add" ? "Add stock" : "Remove stock"}</button>)}</div>
           )}
-          <div><Label htmlFor="s-qty">Quantity</Label><Input id="s-qty" inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} />{after !== null && <p className="mt-1.5 text-xs text-muted">{v.onHand} → <strong className={after < 0 ? "text-danger" : "text-fg"}>{after}</strong></p>}</div>
+          <div><Label htmlFor="s-qty">Quantity</Label><Input id="s-qty" inputMode={fractional ? "decimal" : "numeric"} value={quantity} onChange={(e) => setQuantity(e.target.value)} />{after !== null && <p className="mt-1.5 text-xs text-muted">{formatQty(v.onHand)} → <strong className={after < 0 ? "text-danger" : "text-fg"}>{formatQty(after)}</strong></p>}</div>
           <div><Label htmlFor="s-note">Note{noteRequired ? "" : " (optional)"}</Label><Input id="s-note" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} placeholder={noteRequired ? "Why is this changing?" : "e.g. Supplier delivery"} /></div>
           <div className="flex justify-end gap-2 border-t border-border pt-4"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" variant="navy" disabled={busy}>{busy && <Loader2 className="animate-spin" />}Update stock</Button></div>
         </form>
@@ -156,7 +157,7 @@ export function HistoryModal({ target, orgId, onClose }: { target: { product: Pr
           <tbody className="divide-y divide-border">{items.map((m) => (
             <tr key={m.id} data-testid="movement-row" className="transition-colors hover:bg-bg-subtle">
               <td className="whitespace-nowrap py-2.5 text-xs text-muted">{new Date(m.createdAt).toLocaleString()}</td><td className="py-2.5">{REASON_LABELS[m.reason] ?? m.reason}</td>
-              <td className={`tabular py-2.5 text-right font-medium ${m.delta > 0 ? "text-accent" : "text-danger"}`}>{m.delta > 0 ? `+${m.delta}` : m.delta}</td><td className="tabular py-2.5 text-right">{m.resultingOnHand}</td>
+              <td className={`tabular py-2.5 text-right font-medium ${m.delta > 0 ? "text-accent" : "text-danger"}`}>{m.delta > 0 ? `+${formatQty(m.delta)}` : formatQty(m.delta)}</td><td className="tabular py-2.5 text-right">{m.resultingOnHand === null ? "—" : formatQty(m.resultingOnHand)}</td>
               <td className="py-2.5 pl-4 text-muted">{m.note ?? "—"}</td><td className="py-2.5 text-muted">{m.actor.name ?? "—"}</td></tr>))}</tbody></table></div>)}
       {next !== null && <Button variant="secondary" size="sm" className="mt-4" onClick={more}>Load older movements</Button>}
     </Modal>
@@ -176,14 +177,14 @@ export function VariantEditModal({ target, orgId, seeCosts, onClose, onSaved }: 
 function EditForm({ target, orgId, seeCosts, onClose, onSaved }: { target: { product: Product; variant: Variant }; orgId: string; seeCosts: boolean; onClose: () => void; onSaved: (msg: string) => void }) {
   const v = target.variant;
   const [price, setPrice] = useState(() => minorToInput(v.priceMinor)); const [cost, setCost] = useState(() => (v.costMinor != null ? minorToInput(v.costMinor) : ""));
-  const [reorder, setReorder] = useState(() => String(v.reorderLevel)); const [barcode, setBarcode] = useState(() => v.barcode ?? "");
+  const [reorder, setReorder] = useState(() => qtyToInput(v.reorderLevel)); const [barcode, setBarcode] = useState(() => v.barcode ?? "");
   const [busy, setBusy] = useState(false); const [error, setError] = useState<string | null>(null);
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setError(null);
-    const p = parseNairaToMinor(price); const c = cost.trim() ? parseNairaToMinor(cost) : undefined; const r = intOrNull(reorder);
+    const p = parseNairaToMinor(price); const c = cost.trim() ? parseNairaToMinor(cost) : undefined; const r = parseQty(reorder, target.product.allowFractional);
     if (p === null) return setError("Enter a valid selling price.");
     if (c === null) return setError("Cost price is not a valid amount.");
-    if (r === null) return setError("Reorder level must be a whole number.");
+    if (r === null) return setError(target.product.allowFractional ? "Reorder level must be a number with up to 3 decimals." : "Reorder level must be a whole number.");
     if (barcode.trim() && !BARCODE_RE.test(barcode.trim())) return setError("Barcode must be 4–32 letters, digits or \"-\".");
     setBusy(true);
     try {
@@ -198,7 +199,7 @@ function EditForm({ target, orgId, seeCosts, onClose, onSaved }: { target: { pro
       <div className="grid gap-4 sm:grid-cols-2">
         <div><Label htmlFor="e-price">Selling price (₦)</Label><Input id="e-price" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} /></div>
         {seeCosts && <div><Label htmlFor="e-cost">Cost price (₦)</Label><Input id="e-cost" inputMode="decimal" value={cost} onChange={(e) => setCost(e.target.value)} /></div>}
-        <div><Label htmlFor="e-reorder">Reorder at</Label><Input id="e-reorder" inputMode="numeric" value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
+        <div><Label htmlFor="e-reorder">Reorder at</Label><Input id="e-reorder" inputMode={target.product.allowFractional ? "decimal" : "numeric"} value={reorder} onChange={(e) => setReorder(e.target.value)} /></div>
         <div><Label htmlFor="e-barcode">Barcode</Label><Input id="e-barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} /></div>
       </div>
       <p className="text-xs text-subtle">Price and cost changes are recorded in the audit log. Stock is changed with “Adjust stock”, never here.</p>

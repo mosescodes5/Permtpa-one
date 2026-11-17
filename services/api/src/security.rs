@@ -1,6 +1,9 @@
 //! Cryptographic primitives: tokens, hashing, CSRF derivation, TOTP, secret encryption.
 use aes_gcm::{Aes256Gcm, KeyInit, aead::Aead};
-use argon2::{Argon2, password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash}};
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
+};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
@@ -38,19 +41,25 @@ pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 
 // ---- passwords (Argon2id, library defaults = OWASP-recommended parameters) ----
 pub fn hash_password(password: &str) -> Result<String, CryptoError> {
-    Argon2::default().hash_password(password.as_bytes()).map(|h| h.to_string()).map_err(|_| CryptoError::Hash)
+    Argon2::default()
+        .hash_password(password.as_bytes())
+        .map(|h| h.to_string())
+        .map_err(|_| CryptoError::Hash)
 }
 
 pub fn verify_password(phc: &str, password: &str) -> bool {
     match PasswordHash::new(phc) {
-        Ok(parsed) => Argon2::default().verify_password(password.as_bytes(), &parsed).is_ok(),
+        Ok(parsed) => Argon2::default()
+            .verify_password(password.as_bytes(), &parsed)
+            .is_ok(),
         Err(_) => false,
     }
 }
 
 // ---- CSRF: token bound to the session (HMAC of the session token hash) ----
 pub fn csrf_token(secret: &[u8; 32], session_token_hash: &[u8; 32]) -> String {
-    let mut mac = <Hmac<Sha256> as hmac::KeyInit>::new_from_slice(secret).expect("hmac accepts any key length");
+    let mut mac = <Hmac<Sha256> as hmac::KeyInit>::new_from_slice(secret)
+        .expect("hmac accepts any key length");
     mac.update(b"permtpa-one:csrf:v1:");
     mac.update(session_token_hash);
     URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
@@ -58,7 +67,8 @@ pub fn csrf_token(secret: &[u8; 32], session_token_hash: &[u8; 32]) -> String {
 
 // ---- TOTP (RFC 6238, HMAC-SHA1, 6 digits, 30 s) ----
 pub fn hotp(secret: &[u8], counter: u64) -> u32 {
-    let mut mac = <Hmac<sha1::Sha1> as hmac::KeyInit>::new_from_slice(secret).expect("hmac accepts any key length");
+    let mut mac = <Hmac<sha1::Sha1> as hmac::KeyInit>::new_from_slice(secret)
+        .expect("hmac accepts any key length");
     mac.update(&counter.to_be_bytes());
     let h = mac.finalize().into_bytes();
     let off = (h[h.len() - 1] & 0x0f) as usize;
@@ -115,7 +125,9 @@ pub fn normalize_recovery_code(input: &str) -> String {
 pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| CryptoError::Decrypt)?;
     let nonce_bytes = random_bytes::<12>()?;
-    let ct = cipher.encrypt(&nonce_bytes.into(), plaintext).map_err(|_| CryptoError::Decrypt)?;
+    let ct = cipher
+        .encrypt(&nonce_bytes.into(), plaintext)
+        .map_err(|_| CryptoError::Decrypt)?;
     let mut out = nonce_bytes.to_vec();
     out.extend(ct);
     Ok(out)
@@ -128,7 +140,9 @@ pub fn decrypt(key: &[u8; 32], blob: &[u8]) -> Result<Vec<u8>, CryptoError> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| CryptoError::Decrypt)?;
     let (nonce, ct) = blob.split_at(12);
     let nonce: [u8; 12] = nonce.try_into().map_err(|_| CryptoError::Decrypt)?;
-    cipher.decrypt(&nonce.into(), ct).map_err(|_| CryptoError::Decrypt)
+    cipher
+        .decrypt(&nonce.into(), ct)
+        .map_err(|_| CryptoError::Decrypt)
 }
 
 #[cfg(test)]
@@ -139,7 +153,13 @@ mod tests {
     fn totp_matches_rfc6238_vectors() {
         // RFC 6238 Appendix B (SHA-1, secret "12345678901234567890"); 6-digit truncation of the 8-digit vectors.
         let secret = b"12345678901234567890";
-        for (t, want) in [(59u64, 287082u32), (1111111109, 81804), (1111111111, 50471), (1234567890, 5924), (2000000000, 279037)] {
+        for (t, want) in [
+            (59u64, 287082u32),
+            (1111111109, 81804),
+            (1111111111, 50471),
+            (1234567890, 5924),
+            (2000000000, 279037),
+        ] {
             assert_eq!(hotp(secret, t / 30), want, "T={t}");
         }
     }
@@ -149,9 +169,17 @@ mod tests {
         let s = b"12345678901234567890";
         let code = format!("{:06}", hotp(s, 59 / 30));
         assert_eq!(verify_totp(s, &code, 59, 0), Some(1));
-        assert_eq!(verify_totp(s, &code, 59 + 30, 0), Some(1), "±1 step tolerance");
+        assert_eq!(
+            verify_totp(s, &code, 59 + 30, 0),
+            Some(1),
+            "±1 step tolerance"
+        );
         assert_eq!(verify_totp(s, &code, 59 + 90, 0), None, "outside window");
-        assert_eq!(verify_totp(s, &code, 59, 1), None, "same step cannot be replayed");
+        assert_eq!(
+            verify_totp(s, &code, 59, 1),
+            None,
+            "same step cannot be replayed"
+        );
         assert_eq!(verify_totp(s, "12345", 59, 0), None);
         assert_eq!(verify_totp(s, "abcdef", 59, 0), None);
     }
@@ -169,7 +197,11 @@ mod tests {
         assert!(verify_password(&h, "correct horse battery staple"));
         assert!(!verify_password(&h, "wrong"));
         assert!(!verify_password("not-a-hash", "x"));
-        assert_ne!(h, hash_password("correct horse battery staple").unwrap(), "salts differ");
+        assert_ne!(
+            h,
+            hash_password("correct horse battery staple").unwrap(),
+            "salts differ"
+        );
     }
 
     #[test]

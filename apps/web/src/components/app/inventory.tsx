@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { formatQty } from "@/lib/quantity";
 import { AlertTriangle, Archive, Box, ChevronLeft, ChevronRight, History, Pencil, Plus, Search, Wallet } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,8 +24,8 @@ function useDebounced<T>(value: T, ms: number) {
 
 function StockBadge({ v }: { v: Variant }) {
   if (v.onHand === 0) return <Badge tone="danger">Out of stock</Badge>;
-  if (v.reorderLevel > 0 && v.onHand <= v.reorderLevel) return <Badge tone="warning"><AlertTriangle className="size-3" />Low · {v.onHand}</Badge>;
-  return <span className="tabular font-medium">{v.onHand}</span>;
+  if (v.reorderLevel > 0 && v.onHand <= v.reorderLevel) return <Badge tone="warning"><AlertTriangle className="size-3" />Low · {formatQty(v.onHand)}</Badge>;
+  return <span className="tabular font-medium">{formatQty(v.onHand)}</span>;
 }
 
 export function Inventory() {
@@ -33,7 +34,7 @@ export function Inventory() {
   const manage = canManageInventory(role); const seeCosts = canViewCosts(role);
   const [search, setSearch] = useState(""); const dsearch = useDebounced(search, 300);
   const [category, setCategory] = useState(""); const [status, setStatus] = useState<"active" | "archived">("active"); const [offset, setOffset] = useState(0);
-  const [page, setPage] = useState<Page | null>(null); const [cats, setCats] = useState<Category[]>([]); const [low, setLow] = useState<LowStockItem[]>([]); const [value, setValue] = useState<{ totalMinor: string; units: number; variantsMissingCost: number } | null>(null);
+  const [page, setPage] = useState<Page | null>(null); const [cats, setCats] = useState<Category[]>([]); const [low, setLow] = useState<LowStockItem[]>([]); const [value, setValue] = useState<{ totalMinor: string; unitsThousandths: number; variantsMissingCost: number } | null>(null);
   const [error, setError] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null); const [reload, setReload] = useState(0);
   const [addOpen, setAddOpen] = useState(false); const [catsOpen, setCatsOpen] = useState(false);
   const [stock, setStock] = useState<Target>(null); const [hist, setHist] = useState<Target>(null); const [edit, setEdit] = useState<Target>(null);
@@ -54,7 +55,7 @@ export function Inventory() {
     if (!orgId) return;
     api<{ categories: Category[] }>(`/v1/orgs/${orgId}/categories`).then((r) => { if (alive) setCats(r.categories); }).catch(() => {});
     api<{ items: LowStockItem[] }>(`/v1/orgs/${orgId}/inventory/low-stock`).then((r) => { if (alive) setLow(r.items); }).catch(() => {});
-    if (seeCosts) api<{ totalMinor: string; units: number; variantsMissingCost: number }>(`/v1/orgs/${orgId}/inventory/valuation`).then((r) => { if (alive) setValue(r); }).catch(() => {});
+    if (seeCosts) api<{ totalMinor: string; unitsThousandths: number; variantsMissingCost: number }>(`/v1/orgs/${orgId}/inventory/valuation`).then((r) => { if (alive) setValue(r); }).catch(() => {});
     return () => { alive = false; };
   }, [orgId, seeCosts, reload]);
 
@@ -76,7 +77,7 @@ export function Inventory() {
       <section aria-label="Summary" className="grid gap-4 sm:grid-cols-3">
         <Card data-hover-scope className="lift rise"><CardContent><p className="flex items-center gap-2 text-sm text-muted"><Box className="size-4 text-accent" />Products</p><p className="tabular font-display mt-2 text-[2rem] leading-none" data-testid="kpi-products">{page?.total ?? "—"}</p><p className="mt-3 text-xs text-subtle">{status === "active" ? "active" : "archived"}</p></CardContent></Card>
         <Card data-hover-scope className="lift rise" style={{ "--i": 1 } as React.CSSProperties}><CardContent><p className="flex items-center gap-2 text-sm text-muted"><AlertTriangle className="size-4 text-warning" />Needs restocking</p><p className="tabular font-display mt-2 text-[2rem] leading-none" data-testid="kpi-low">{low.length}</p><p className="mt-3 text-xs text-subtle">at or below their reorder level</p></CardContent></Card>
-        {seeCosts && <Card data-hover-scope className="lift rise" style={{ "--i": 2 } as React.CSSProperties}><CardContent><p className="flex items-center gap-2 text-sm text-muted"><Wallet className="size-4 text-accent" />Stock value</p><p className="tabular font-display mt-2 text-[2rem] leading-none" data-testid="kpi-value">{value ? formatMoney(BigInt(value.totalMinor), "NGN", { compact: true }) : "—"}</p><p className="mt-3 text-xs text-subtle">{value ? `${value.units} units at cost${value.variantsMissingCost ? ` · ${value.variantsMissingCost} without a cost` : ""}` : ""}</p></CardContent></Card>}
+        {seeCosts && <Card data-hover-scope className="lift rise" style={{ "--i": 2 } as React.CSSProperties}><CardContent><p className="flex items-center gap-2 text-sm text-muted"><Wallet className="size-4 text-accent" />Stock value</p><p className="tabular font-display mt-2 text-[2rem] leading-none" data-testid="kpi-value">{value ? formatMoney(BigInt(value.totalMinor), "NGN", { compact: true }) : "—"}</p><p className="mt-3 text-xs text-subtle">{value ? `${formatQty(value.unitsThousandths)} units at cost${value.variantsMissingCost ? ` · ${value.variantsMissingCost} without a cost` : ""}` : ""}</p></CardContent></Card>}
       </section>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

@@ -142,7 +142,7 @@ test("inventory pages fit the screen (no horizontal page scroll) on every device
   // create a product through the API from the logged-in browser context (CSRF token + Origin as the UI would send)
   const csrf = ((await (await page.request.get("/api/v1/auth/csrf")).json()) as { csrfToken: string }).csrfToken;
   const orgId = ((await (await page.request.get("/api/v1/me")).json()) as { memberships: { orgId: string }[] }).memberships[0]!.orgId;
-  const r = await page.request.post(`/api/v1/orgs/${orgId}/products`, { headers: { "x-csrf-token": csrf, origin: "http://localhost:3100" }, data: { name: "A fairly long product name to stress the table layout on narrow screens", variants: [{ sku: "FIT-1", priceMinor: 123456789, costMinor: 100, openingStock: 5, reorderLevel: 10 }] } });
+  const r = await page.request.post(`/api/v1/orgs/${orgId}/products`, { headers: { "x-csrf-token": csrf, origin: "http://localhost:3100" }, data: { name: "A fairly long product name to stress the table layout on narrow screens", variants: [{ sku: "FIT-1", priceMinor: 123456789, costMinor: 100, openingStock: 5000, reorderLevel: 10000 }] } });
   expect(r.status()).toBe(201);
   // Wait for REAL content before measuring (a loading skeleton is narrow and would hide an overflow bug).
   const ready = { "/inventory": page.getByTestId("variant-row").first(), "/team": page.getByTestId("member-row").first(), "/dashboard": page.getByRole("heading", { name: "Top products" }) } as const;
