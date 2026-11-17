@@ -78,7 +78,7 @@ pub fn hotp(secret: &[u8], counter: u64) -> u32 {
     bin % 1_000_000
 }
 
-/// Returns the matched time-step if `code` is valid within ±1 step AND that step is newer than the last one used
+/// Returns the matched time-step if `code` is valid within Â±1 step AND that step is newer than the last one used
 /// (so a captured code cannot be replayed).
 pub fn verify_totp(secret: &[u8], code: &str, now_unix: u64, last_used_step: i64) -> Option<u64> {
     if code.len() != 6 || !code.bytes().all(|b| b.is_ascii_digit()) {
@@ -174,7 +174,7 @@ mod tests {
         assert_eq!(
             verify_totp(s, &code, 59 + 30, 0),
             Some(1),
-            "±1 step tolerance"
+            "Â±1 step tolerance"
         );
         assert_eq!(verify_totp(s, &code, 59 + 90, 0), None, "outside window");
         assert_eq!(

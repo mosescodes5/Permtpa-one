@@ -9,9 +9,9 @@ pub struct Email {
 }
 
 /// Outbound email.
-/// * `Smtp` — real delivery (TLS is enforced outside development by `Config`).
-/// * `Capture` — in-memory outbox for tests and local development.
-/// * `Disabled` — refuses to send, so a misconfigured environment fails loudly instead of pretending.
+/// * `Smtp` â€” real delivery (TLS is enforced outside development by `Config`).
+/// * `Capture` â€” in-memory outbox for tests and local development.
+/// * `Disabled` â€” refuses to send, so a misconfigured environment fails loudly instead of pretending.
 #[derive(Clone)]
 #[allow(clippy::large_enum_variant)] // a single long-lived instance lives in app state
 pub enum Mailer {

@@ -153,7 +153,7 @@ pub fn router(state: AppState) -> Router {
             "/v1/orgs/{org_id}/inventory/valuation",
             get(crate::inventory::valuation),
         );
-    // The development outbox exists ONLY in development (404 everywhere else — see tests).
+    // The development outbox exists ONLY in development (404 everywhere else â€” see tests).
     if state.cfg.environment == Environment::Development {
         v1 = v1
             .route("/v1/dev/outbox", get(dev_outbox))
