@@ -1,4 +1,4 @@
-//! PERMTPA ONE domain core. Pure types and rules — no I/O, no framework dependencies.
+//! PERMTPA ONE domain core. Pure types and rules â€” no I/O, no framework dependencies.
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 use std::{fmt, str::FromStr};
