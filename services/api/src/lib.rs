@@ -1,5 +1,6 @@
 //! PERMTPA ONE API library (kept separate from `main` so it is testable end to end).
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
+#![allow(clippy::collapsible_if, clippy::type_complexity)]
 pub mod app;
 pub mod auth;
 pub mod config;
