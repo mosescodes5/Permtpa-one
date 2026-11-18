@@ -18,6 +18,6 @@ c = Controller(Handler(), hostname="127.0.0.1", port=PORT)
 c.start()
 print(f"smtp sink on 127.0.0.1:{PORT} -> {OUT}", flush=True)
 try:
-    asyncio.get_event_loop().run_forever()
+    asyncio.run(asyncio.Event().wait())
 except KeyboardInterrupt:
     c.stop()
