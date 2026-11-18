@@ -18,7 +18,7 @@ fn qp_decode(s: &str) -> String {
     let (mut out, mut i) = (Vec::new(), 0);
     while i < b.len() {
         if b[i] == b'='
-            && i + 2 < b.len() + 0
+            && i + 2 < b.len()
             && let Ok(v) = u8::from_str_radix(&joined[i + 1..i + 3], 16)
         {
             out.push(v);
