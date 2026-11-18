@@ -53,8 +53,8 @@ jobs:
           done
           cargo test -p permtpa-api --no-fail-fast -- --ignored --test-threads=4
         env: { TEST_SMTP_URL: "smtp://127.0.0.1:1025", TEST_SMTP_LOG: /tmp/smtp-sink.log }
-      - run: ./scripts/test-db.sh
-      - run: ./scripts/test-0009-upgrade.sh
+      - run: bash ./scripts/test-db.sh
+      - run: bash ./scripts/test-0009-upgrade.sh
       - run: cargo install cargo-audit cargo-deny --locked
       - run: cargo audit
       - run: cargo deny check
@@ -80,7 +80,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: npm ci
       - run: cargo build -p permtpa-api
-      - run: ./scripts/e2e-setup.sh
+      - run: bash ./scripts/e2e-setup.sh
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
       - run: npm run test:e2e
