@@ -56,7 +56,16 @@ jobs:
       - run: bash ./scripts/test-db.sh
       - run: bash ./scripts/test-0009-upgrade.sh
       - run: cargo install cargo-audit cargo-deny --locked
-      - run: cargo audit
+      - name: Prove libsqlite3-sys is not compiled into the build
+        # RUSTSEC-2026-0459 is ignored below ONLY while this step passes. This project uses PostgreSQL;
+        # the SQLite crate is in Cargo.lock only because sqlx lists its optional drivers.
+        run: |
+          if cargo tree --workspace --all-features --target all -e normal,build -i libsqlite3-sys 2>/dev/null | grep -q "libsqlite3-sys"; then
+            echo "libsqlite3-sys IS in the build graph - do not ignore RUSTSEC-2026-0459"
+            exit 1
+          fi
+          echo "libsqlite3-sys is not in the build graph"
+      - run: cargo audit --ignore RUSTSEC-2026-0459
       - run: cargo deny check
 
   e2e:
