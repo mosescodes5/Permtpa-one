@@ -39,11 +39,19 @@ jobs:
         with: { components: "clippy, rustfmt" }
       - uses: Swatinem/rust-cache@v2
       - run: pip install aiosmtpd
-      - run: python3 scripts/smtp-sink.py 1025 /tmp/smtp-sink.log &
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-      - run: cargo test -p permtpa-api -- --ignored --test-threads=4
+      - name: Database-backed and SMTP tests
+        # The SMTP sink must start in the SAME step as the tests: GitHub kills background
+        # processes when the step that started them ends. Wait until its port accepts connections.
+        run: |
+          python3 scripts/smtp-sink.py 1025 /tmp/smtp-sink.log &
+          for i in $(seq 1 50); do
+            (echo > /dev/tcp/127.0.0.1/1025) 2>/dev/null && break
+            sleep 0.2
+          done
+          cargo test -p permtpa-api --no-fail-fast -- --ignored --test-threads=4
         env: { TEST_SMTP_URL: "smtp://127.0.0.1:1025", TEST_SMTP_LOG: /tmp/smtp-sink.log }
       - run: ./scripts/test-db.sh
       - run: ./scripts/test-0009-upgrade.sh
