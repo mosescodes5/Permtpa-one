@@ -333,6 +333,7 @@ select pg_temp.blocked('the app role cannot turn fractions OFF for an existing p
 select pg_temp.blocked('delta above the cap is rejected', format($q$insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (%L, %L, 100000000001, 'purchase', %L)$q$, :'org_a', :'var_f', :'ivy'));
 select pg_temp.blocked('negative reorder level is rejected', format($q$update variants set reorder_level = -1 where id = %L$q$, :'var_f'));
 select pg_temp.blocked('reorder level above the cap is rejected', format($q$update variants set reorder_level = 100000000001 where id = %L$q$, :'var_f'));
+select pg_temp.as_ctx(:'alice', :'org_a');
 select pg_temp.ok('fractional stock audit rows carry the quantity scale', (select count(*) from audit_logs where org_id = :'org_a' and action = 'stock.adjust' and (metadata->>'qty_scale')::int = 1000) >= 1);
 select pg_temp.as_ctx(:'bob', :'org_b');
 select pg_temp.blocked('org B cannot move org A fractional stock', format($q$insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (%L, %L, 500, 'purchase', %L)$q$, :'org_b', :'var_f', :'bob'));
