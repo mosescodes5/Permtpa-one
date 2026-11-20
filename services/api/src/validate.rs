@@ -83,6 +83,28 @@ pub fn org_name(raw: &str) -> Result<String, ApiError> {
     }
 }
 
+/// Optional phone number. An empty value means "none". Digits, spaces, '(', ')', '-' and a leading '+'; 7-20 characters
+/// after the '+'. Mirrors the CHECK constraint on `organizations.phone`.
+pub fn phone(raw: &str) -> Result<Option<String>, ApiError> {
+    let p = raw.trim();
+    if p.is_empty() {
+        return Ok(None);
+    }
+    let body = p.strip_prefix('+').unwrap_or(p);
+    let ok = (7..=20).contains(&body.len())
+        && body
+            .chars()
+            .all(|c| c.is_ascii_digit() || matches!(c, ' ' | '(' | ')' | '-'));
+    if ok {
+        Ok(Some(p.to_owned()))
+    } else {
+        Err(ApiError::bad(
+            "invalid_phone",
+            "Enter a valid phone number.",
+        ))
+    }
+}
+
 pub fn slugify(name: &str) -> String {
     let mut s: String = name
         .to_lowercase()
@@ -139,5 +161,27 @@ mod tests {
         assert_eq!(slugify("Okafor & Sons Trading!"), "okafor-sons-trading");
         assert_eq!(slugify("***"), "org");
         assert!(slugify(&"x".repeat(200)).len() <= 40);
+    }
+
+    #[test]
+    fn phone_numbers() {
+        assert_eq!(phone("   ").unwrap(), None);
+        assert_eq!(
+            phone(" +234 803 123 4567 ").unwrap().as_deref(),
+            Some("+234 803 123 4567")
+        );
+        assert_eq!(
+            phone("(0803) 123-4567").unwrap().as_deref(),
+            Some("(0803) 123-4567")
+        );
+        for bad in [
+            "123456",
+            "abc12345678",
+            "0803+1234567",
+            "+",
+            "080312345678901234567",
+        ] {
+            assert!(phone(bad).is_err(), "{bad} should be rejected");
+        }
     }
 }

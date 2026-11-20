@@ -94,11 +94,35 @@ pub(crate) fn map_db(e: sqlx::Error) -> ApiError {
 }
 
 async fn profile(tx: &mut Tx, org_id: Uuid, role: OrgRole) -> Result<Value, ApiError> {
-    let (id, name, slug, btype, currency): (Uuid, String, String, String, String) =
-        sqlx::query_as("select id, name, slug::text, business_type, currency::text from organizations where id = $1").bind(org_id).fetch_one(&mut **tx).await?;
-    Ok(
-        json!({ "id": id, "name": name, "slug": slug, "businessType": btype, "currency": currency, "yourRole": role.as_str() }),
+    let (id, name, slug, btype, currency, phone): (
+        Uuid,
+        String,
+        String,
+        String,
+        String,
+        Option<String>,
+    ) = sqlx::query_as(
+        "select id, name, slug::text, business_type, currency::text, phone from organizations where id = $1",
     )
+    .bind(org_id)
+    .fetch_one(&mut **tx)
+    .await?;
+    let flags: (bool, bool, bool, bool) = sqlx::query_as(
+        "select tracks_expiry, sold_by_weight, has_tables, has_bookings from business_types where code = $1",
+    )
+    .bind(&btype)
+    .fetch_one(&mut **tx)
+    .await?;
+    Ok(json!({
+        "id": id,
+        "name": name,
+        "slug": slug,
+        "businessType": btype,
+        "currency": currency,
+        "phone": phone,
+        "capabilities": crate::onboarding::capabilities(flags),
+        "yourRole": role.as_str()
+    }))
 }
 
 pub async fn org_get(
@@ -117,6 +141,8 @@ pub async fn org_get(
 pub struct UpdateOrg {
     name: Option<String>,
     business_type: Option<String>,
+    /// Empty string clears the phone number.
+    phone: Option<String>,
 }
 
 pub async fn org_update(
@@ -127,15 +153,30 @@ pub async fn org_update(
 ) -> Result<Json<Value>, ApiError> {
     let (mut tx, role) = org_tx(&s, &sess, org_id).await?;
     require_admin(role)?;
-    if req.name.is_none() && req.business_type.is_none() {
+    if req.name.is_none() && req.business_type.is_none() && req.phone.is_none() {
         return Err(ApiError::bad(
             "nothing_to_update",
             "Provide a field to change.",
         ));
     }
     let name = req.name.as_deref().map(validate::org_name).transpose()?;
-    let n = sqlx::query("update organizations set name = coalesce($2, name), business_type = coalesce($3, business_type) where id = $1")
-        .bind(org_id).bind(name).bind(req.business_type).execute(&mut *tx).await.map_err(map_db)?.rows_affected();
+    let phone_given = req.phone.is_some();
+    let phone = req
+        .phone
+        .as_deref()
+        .map(validate::phone)
+        .transpose()?
+        .flatten();
+    let n = sqlx::query("update organizations set name = coalesce($2, name), business_type = coalesce($3, business_type), phone = case when $4 then $5 else phone end where id = $1")
+        .bind(org_id)
+        .bind(name)
+        .bind(req.business_type)
+        .bind(phone_given)
+        .bind(phone)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_db)?
+        .rows_affected();
     if n == 0 {
         return Err(ApiError::Forbidden { code: "forbidden" });
     }

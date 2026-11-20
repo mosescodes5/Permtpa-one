@@ -393,7 +393,7 @@ async fn fetch_products(tx: &mut Tx, org: Uuid, f: &Filter) -> Result<(Vec<Value
     .fetch_one(&mut **tx)
     .await?;
     let sql = format!(
-        "select p.id, p.name, p.description, p.unit, p.status, p.category_id, c.name::text, p.allow_fractional,
+        "select p.id, p.name, p.description, p.unit, p.status, p.category_id, c.name::text, p.allow_fractional, p.sample_key is not null,
             coalesce(json_agg(json_build_object('id', v.id, 'name', v.name, 'sku', v.sku::text, 'barcode', v.barcode, 'priceMinor', v.price_minor, 'costMinor', vc.cost_minor,
                 'reorderLevel', v.reorder_level, 'status', v.status, 'onHand', coalesce(sl.on_hand, 0)) order by v.seq) filter (where v.id is not null), '[]'::json)::text
          from products p
@@ -412,6 +412,7 @@ async fn fetch_products(tx: &mut Tx, org: Uuid, f: &Filter) -> Result<(Vec<Value
         Option<Uuid>,
         Option<String>,
         bool,
+        bool,
         String,
     );
     let rows: Vec<Row> = sqlx::query_as(sqlx::AssertSqlSafe(sql))
@@ -423,8 +424,8 @@ async fn fetch_products(tx: &mut Tx, org: Uuid, f: &Filter) -> Result<(Vec<Value
         .bind(f.search.as_deref())
         .fetch_all(&mut **tx)
         .await?;
-    let items = rows.into_iter().map(|(id, name, desc, unit, st, cat, cat_name, frac, variants)| {
-        json!({ "id": id, "name": name, "description": desc, "unit": unit, "status": st, "categoryId": cat, "category": cat_name, "allowFractional": frac, "variants": serde_json::from_str::<Value>(&variants).unwrap_or(Value::Null) })
+    let items = rows.into_iter().map(|(id, name, desc, unit, st, cat, cat_name, frac, sample, variants)| {
+        json!({ "id": id, "name": name, "description": desc, "unit": unit, "status": st, "categoryId": cat, "category": cat_name, "allowFractional": frac, "isSample": sample, "variants": serde_json::from_str::<Value>(&variants).unwrap_or(Value::Null) })
     }).collect();
     Ok((items, total))
 }

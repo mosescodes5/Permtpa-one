@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Eye, EyeOff, Loader2, MailCheck, TriangleAlert } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { ApiProblem, BUSINESS_TYPES, api, problemMessage, setCsrfToken } from "@/lib/api";
+import { ApiProblem, api, problemMessage, setCsrfToken, type BusinessType } from "@/lib/api";
 import { forgotSchema, loginSchema, onboardingSchema, passwordStrength, registerSchema, resetSchema, type ForgotInput, type LoginInput, type OnboardingInput, type RegisterInput, type ResetInput } from "@/lib/validation";
 
 /** Only same-site relative paths are honoured — prevents open-redirect abuse of `?next=`. */
@@ -180,21 +180,75 @@ export function ResetForm() {
 
 export function OnboardingForm({ onCreated }: { onCreated: () => Promise<void> | void }) {
   const [error, setError] = useState<string | null>(null);
-  const f = useForm<OnboardingInput>({ resolver: zodResolver(onboardingSchema), defaultValues: { name: "", businessType: "" } });
+  const [partial, setPartial] = useState<string | null>(null);
+  const [types, setTypes] = useState<BusinessType[] | null>(null);
+  const f = useForm<OnboardingInput>({ resolver: zodResolver(onboardingSchema), defaultValues: { name: "", phone: "", businessType: "", loadSamples: false } });
   const { errors, isSubmitting } = f.formState;
-  return (
-    <form noValidate onSubmit={f.handleSubmit(async (v) => { setError(null); try { await api("/v1/organizations", { method: "POST", body: v }); await onCreated(); } catch (e) { setError(problemMessage(e)); } })} className="space-y-4">
-      {error && <Banner tone="error">{error}</Banner>}
-      <div><Label htmlFor="name">Business name</Label><Input id="name" autoComplete="organization" aria-invalid={!!errors.name} {...f.register("name")} /><FieldError>{errors.name?.message}</FieldError></div>
-      <div>
-        <Label htmlFor="businessType">What kind of business is it?</Label>
-        <select id="businessType" aria-invalid={!!errors.businessType} className="h-11 w-full cursor-pointer rounded-lg border border-border-strong bg-surface px-3 text-sm shadow-sm focus-visible:border-accent focus-visible:outline-none" {...f.register("businessType")}>
-          <option value="">Select…</option>
-          {BUSINESS_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <FieldError>{errors.businessType?.message}</FieldError>
+
+  useEffect(() => {
+    let alive = true;
+    api<{ items: BusinessType[] }>("/v1/business-types").then((r) => { if (alive) setTypes(r.items); }).catch((e) => { if (alive) setError(problemMessage(e)); });
+    return () => { alive = false; };
+  }, []);
+
+  async function submit(v: OnboardingInput) {
+    setError(null);
+    let orgId: string;
+    try {
+      const org = await api<{ id: string }>("/v1/organizations", { method: "POST", body: { name: v.name, businessType: v.businessType } });
+      orgId = org.id;
+    } catch (e) { setError(problemMessage(e)); return; }
+    // The workspace now exists. Optional extras are separate, individually authorised calls; a failure must not hide that.
+    const missed: string[] = [];
+    if (v.phone.trim()) {
+      try { await api(`/v1/orgs/${orgId}`, { method: "PATCH", body: { phone: v.phone.trim() } }); } catch { missed.push("save your phone number"); }
+    }
+    if (v.loadSamples) {
+      try { await api(`/v1/orgs/${orgId}/sample-catalogue`, { method: "POST" }); } catch { missed.push("load the sample catalogue"); }
+    }
+    if (missed.length > 0) { setPartial(`Your workspace was created, but we could not ${missed.join(" or ")}. You can do that later from the Organization and Inventory pages.`); return; }
+    await onCreated();
+  }
+
+  if (partial) {
+    return (
+      <div className="space-y-4">
+        <Banner tone="error">{partial}</Banner>
+        <Button variant="navy" size="lg" className="w-full" onClick={() => void onCreated()}>Go to dashboard</Button>
       </div>
-      <Submit loading={isSubmitting}>Create workspace</Submit>
+    );
+  }
+  return (
+    <form noValidate onSubmit={f.handleSubmit(submit)} className="space-y-6">
+      {error && <Banner tone="error">{error}</Banner>}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div><Label htmlFor="name">Business name</Label><Input id="name" autoComplete="organization" aria-invalid={!!errors.name} {...f.register("name")} /><FieldError>{errors.name?.message}</FieldError></div>
+        <div><Label htmlFor="phone">Phone number (optional)</Label><Input id="phone" type="tel" autoComplete="tel" placeholder="+234 …" aria-invalid={!!errors.phone} {...f.register("phone")} /><FieldError>{errors.phone?.message}</FieldError></div>
+      </div>
+      <fieldset aria-describedby={errors.businessType ? "type-error" : undefined}>
+        <legend className="mb-2 text-sm font-medium text-fg">What kind of business is it?</legend>
+        {!types && !error && <div className="skeleton h-40 w-full" />}
+        {types && (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {types.map((t) => (
+              <label key={t.code} className="relative flex cursor-pointer flex-col rounded-xl border border-border-strong bg-surface p-3.5 text-left shadow-sm transition-colors hover:border-accent has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-[color-mix(in_srgb,var(--accent)_18%,transparent)]">
+                <input type="radio" value={t.code} className="absolute inset-0 size-full cursor-pointer opacity-0" {...f.register("businessType")} />
+                <span className="text-sm font-semibold">{t.label}</span>
+                <span className="mt-0.5 text-xs text-muted">{t.description}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <FieldError id="type-error">{errors.businessType?.message}</FieldError>
+      </fieldset>
+      <div className="flex items-start gap-3 rounded-xl border border-border bg-bg-subtle p-3.5">
+        <input id="loadSamples" type="checkbox" className="mt-0.5 size-4 cursor-pointer accent-[var(--accent)]" {...f.register("loadSamples")} />
+        <div>
+          <Label htmlFor="loadSamples" className="mb-0.5 cursor-pointer">Load a sample catalogue</Label>
+          <p className="text-xs text-muted">Add a few example products so you can test a sale immediately. You can delete them later.</p>
+        </div>
+      </div>
+      <Submit loading={isSubmitting}>Finish setup</Submit>
     </form>
   );
 }

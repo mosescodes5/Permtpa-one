@@ -9,7 +9,7 @@ export default function Page() {
   const router = useRouter();
   return (
     <AuthGate>
-      <AuthShell title={`Welcome${me ? `, ${me.user.fullName.split(" ")[0]}` : ""}`} subtitle="Set up your workspace. You will be its Owner." footer={<>You can add teammates and more businesses later.</>}>
+      <AuthShell wide title={`Welcome${me ? `, ${me.user.fullName.split(" ")[0]}` : ""}`} subtitle="Set up your workspace. You will be its Owner." footer={<>You can add teammates and more businesses later.</>}>
         <OnboardingForm onCreated={async () => { await refresh(); router.replace("/dashboard"); }} />
       </AuthShell>
     </AuthGate>

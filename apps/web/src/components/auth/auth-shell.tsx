@@ -2,12 +2,12 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: React.ReactNode; footer: React.ReactNode }) {
+export function AuthShell({ title, subtitle, children, footer, wide = false }: { title: string; subtitle: string; children: React.ReactNode; footer: React.ReactNode; wide?: boolean }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1fr_1.05fr]">
       <div className="flex flex-col px-5 py-6 sm:px-10">
         <div className="flex items-center justify-between"><Link href="/" aria-label="PERMTPA ONE home"><Logo /></Link><ThemeToggle /></div>
-        <main className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center py-10">
+        <main className={`mx-auto flex w-full ${wide ? "max-w-[600px]" : "max-w-[400px]"} flex-1 flex-col justify-center py-10`}>
           <h1 className="font-display text-4xl">{title}</h1>
           <p className="mt-2 text-sm text-muted">{subtitle}</p>
           <div className="mt-8">{children}</div>

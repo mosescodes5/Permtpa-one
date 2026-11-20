@@ -51,13 +51,18 @@ export type SessionInfo = { id: string; createdAt: string; lastSeenAt: string; u
 
 export type Member = { userId: string; fullName: string; email: string | null; role: string; status: string };
 export type Invitation = { id: string; email: string; role: string; createdAt: string; expiresAt: string };
-export type OrgProfile = { id: string; name: string; slug: string; businessType: string; currency: string; yourRole: string };
+export type Capabilities = { tracksExpiry: boolean; soldByWeight: boolean; hasTables: boolean; hasBookings: boolean };
+export type BusinessType = { code: string; label: string; description: string; capabilities: Capabilities };
+export type OrgProfile = { id: string; name: string; slug: string; businessType: string; currency: string; phone: string | null; capabilities: Capabilities; yourRole: string };
+export type SampleStatus = { loadable: number; present: number; deletable: number; keptWithHistory: number };
+export type SampleLoadResult = { loaded: number; alreadyPresent: number; skippedSkuTaken: number };
+export type SampleDeleteResult = { deleted: number; kept: { id: string; name: string }[] };
 export const ROLE_LABELS: Record<string, string> = { owner: "Owner", administrator: "Administrator", manager: "Manager", accountant: "Accountant", inventory_manager: "Inventory Manager", sales_staff: "Sales Staff", read_only: "Read Only" };
 export const ROLE_HELP: Record<string, string> = { owner: "Full control, including billing and ownership", administrator: "Manages the team and settings", manager: "Runs day-to-day operations", accountant: "Finance and reports", inventory_manager: "Products and stock", sales_staff: "Records sales", read_only: "Can view, cannot change" };
 export const ASSIGNABLE_ROLES = ["administrator", "manager", "accountant", "inventory_manager", "sales_staff", "read_only"] as const;
 
 export type Variant = { id: string; name: string; sku: string; barcode: string | null; priceMinor: number; costMinor: number | null; reorderLevel: number; status: string; onHand: number };
-export type Product = { id: string; name: string; description: string | null; unit: string; allowFractional: boolean; status: string; categoryId: string | null; category: string | null; variants: Variant[] };
+export type Product = { id: string; name: string; description: string | null; unit: string; allowFractional: boolean; isSample: boolean; status: string; categoryId: string | null; category: string | null; variants: Variant[] };
 export type Category = { id: string; name: string; productCount: number };
 export type Movement = { id: number; delta: number; reason: string; note: string | null; resultingOnHand: number | null; actor: { id: string; name: string | null }; createdAt: string };
 export type LowStockItem = { variantId: string; productId: string; productName: string; variantName: string; sku: string; onHand: number; reorderLevel: number };
@@ -65,10 +70,8 @@ export const REASON_LABELS: Record<string, string> = { opening: "Opening stock",
 export const canManageInventory = (role: string) => ["owner", "administrator", "manager", "inventory_manager"].includes(role);
 export const canViewCosts = (role: string) => canManageInventory(role) || role === "accountant";
 
-export const BUSINESS_TYPES = [
-  ["retail", "Retail"], ["agriculture", "Agriculture"], ["restaurant", "Restaurant"], ["distribution", "Distribution"],
-  ["services", "Services"], ["agency", "Agency"], ["other", "Other"],
-] as const;
+/** Older business types stay valid for existing organizations but are no longer offered; shown by label when an org still has one. */
+export const LEGACY_TYPE_LABELS: Record<string, string> = { retail: "Retail", agriculture: "Agriculture", distribution: "Distribution", agency: "Agency" };
 
 /** Friendly copy for API error codes. Never echoes server internals. */
 export function problemMessage(e: unknown): string {
@@ -84,6 +87,7 @@ export function problemMessage(e: unknown): string {
     case "already_member": return "That person is already on your team.";
     case "conflict": return "That conflicts with something that already exists.";
     case "invalid_role": return "Choose a valid role.";
+    case "invalid_phone": return "Enter a valid phone number.";
     case "sku_taken": return "That SKU is already used by another item.";
     case "barcode_taken": return "That barcode is already used by another item.";
     case "name_taken": return "That name already exists.";

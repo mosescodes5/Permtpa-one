@@ -339,4 +339,147 @@ select pg_temp.as_ctx(:'bob', :'org_b');
 select pg_temp.blocked('org B cannot move org A fractional stock', format($q$insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (%L, %L, 500, 'purchase', %L)$q$, :'org_b', :'var_f', :'bob'));
 select pg_temp.blocked('org B cannot mint a fractional movement against org A through its own org id', format($q$insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (%L, %L, 500, 'purchase', %L)$q$, :'org_a', :'var_f', :'bob'));
 
+
+-- ---------- 0010 business types, capability flags and the deletable sample catalogue ----------
+select pg_temp.as_ctx(:'alice', null);
+select app.create_organization('Org S','org-s','electronics') as org_s \gset
+select app.create_organization('Org M','org-m','building_materials') as org_m \gset
+select pg_temp.as_ctx(:'bob', null);
+select app.create_organization('Org T','org-t','fashion') as org_t \gset
+select pg_temp.as_ctx(:'alice', :'org_s');
+insert into memberships (org_id, user_id, role) values (:'org_s', :'ivy', 'inventory_manager'), (:'org_s', :'sam', 'sales_staff'), (:'org_s', :'rob', 'read_only'), (:'org_s', :'acc', 'accountant'), (:'org_s', :'mia', 'manager'), (:'org_s', :'dave', 'administrator');
+
+-- business types: 12 offered, 4 legacy kept valid but hidden; flags live in the database and the app role cannot edit them
+select pg_temp.ok('12 business types are offered and 4 legacy ones stay valid but hidden', (select count(*) from business_types where selectable) = 12 and (select count(*) from business_types where not selectable) = 4);
+select pg_temp.ok('capability flags follow the business type', (select tracks_expiry from business_types where code = 'pharmacy') and (select sold_by_weight from business_types where code = 'building_materials') and (select sold_by_weight from business_types where code = 'supermarket') and (select has_tables from business_types where code = 'restaurant') and (select has_bookings from business_types where code = 'services') and not (select tracks_expiry from business_types where code = 'electronics'));
+select pg_temp.blocked('app role cannot edit capability flags', $q$update business_types set tracks_expiry = true where code = 'electronics'$q$);
+select pg_temp.blocked('app role cannot add business types', $q$insert into business_types (code, label) values ('crypto_shop', 'Crypto shop')$q$);
+select pg_temp.blocked('an unknown business type cannot be given to an organization', format($q$update organizations set business_type = 'cryptozoology' where id = %L$q$, :'org_s'));
+
+-- the reference data holds COST prices: no role may read it directly
+select pg_temp.as_ctx(:'sam', :'org_s');
+select pg_temp.blocked('sales staff cannot read the sample reference data (it holds costs)', $q$select * from sample_catalogue_items$q$);
+select pg_temp.as_ctx(:'alice', :'org_s');
+select pg_temp.blocked('even the owner cannot read the sample reference data directly', $q$select * from sample_catalogue_items$q$);
+
+-- organization phone: optional, shape-checked, owner/administrator only
+select pg_temp.ok('owner can set the phone number', pg_temp.affected(format($q$update organizations set phone = '+234 803 123 4567' where id = %L$q$, :'org_s')) = 1);
+select pg_temp.blocked('a malformed phone number is rejected', format($q$update organizations set phone = 'call me maybe' where id = %L$q$, :'org_s'));
+select pg_temp.as_ctx(:'ivy', :'org_s');
+select pg_temp.ok('an inventory manager cannot change the phone number (RLS hides the row)', pg_temp.affected(format($q$update organizations set phone = '08000000000' where id = %L$q$, :'org_s')) = 0);
+
+-- role matrix for load / delete
+select pg_temp.as_ctx(:'sam', :'org_s');
+select pg_temp.blocked('sales staff cannot load samples', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.blocked('sales staff cannot delete samples', format($q$select app.delete_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(:'rob', :'org_s');
+select pg_temp.blocked('read-only users cannot load samples', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(:'acc', :'org_s');
+select pg_temp.blocked('accountants cannot load samples', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.blocked('accountants cannot delete samples', format($q$select app.delete_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(:'ivy', :'org_s');
+select pg_temp.ok('the rejected attempts created nothing', (select count(*) from products where sample_key is not null) = 0);
+
+-- load: allowed for an inventory manager, idempotent
+select (app.load_sample_catalogue(:'org_s')->>'loaded')::int as n1 \gset
+select (app.load_sample_catalogue(:'org_s')->>'loaded')::int as n2 \gset
+select pg_temp.ok('an inventory manager can load the electronics samples (5)', :n1 = 5);
+select pg_temp.ok('loading twice does not duplicate', :n2 = 0 and (select count(*) from products where sample_key is not null) = 5 and (select count(*) from variants where sku like 'SMP-ELECTRONICS-%') = 5);
+select pg_temp.ok('samples are flagged and carry opening stock', (select count(*) from stock_movements where is_sample and reason = 'opening') = 5 and (select count(*) from stock_levels where on_hand > 0) >= 5);
+select pg_temp.ok('manager-level roles see sample costs (inventory manager)', (select count(*) from variant_costs vc join variants v on v.id = vc.variant_id where v.sku like 'SMP-%') = 5);
+
+-- profit visibility: Sales Staff and Read Only never see sample costs, accountants do
+select pg_temp.as_ctx(:'sam', :'org_s');
+select pg_temp.ok('sales staff see sample products but zero costs', (select count(*) from products where sample_key is not null) = 5 and (select count(*) from variant_costs) = 0);
+select pg_temp.as_ctx(:'rob', :'org_s');
+select pg_temp.ok('read-only users see zero costs', (select count(*) from variant_costs) = 0);
+select pg_temp.as_ctx(:'acc', :'org_s');
+select pg_temp.ok('accountants can see sample costs', (select count(*) from variant_costs) = 5);
+
+-- status: counts only, any member
+select pg_temp.as_ctx(:'sam', :'org_s');
+select pg_temp.ok('any member can read the status counts', (app.sample_catalogue_status(:'org_s')->>'present')::int = 5 and (app.sample_catalogue_status(:'org_s')->>'loadable')::int = 0 and (app.sample_catalogue_status(:'org_s')->>'deletable')::int = 5);
+
+-- cross-tenant
+select pg_temp.as_ctx(:'bob', :'org_t');
+select pg_temp.blocked('org B cannot load samples into org S by passing its id', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.blocked('org B cannot delete org S samples', format($q$select app.delete_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.blocked('org B cannot read org S sample status', format($q$select app.sample_catalogue_status(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(:'bob', :'org_s');
+select pg_temp.blocked('a forged org context cannot load samples', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.blocked('a forged org context cannot delete samples', format($q$select app.delete_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(null, null);
+select pg_temp.blocked('no context: cannot load samples', format($q$select app.load_sample_catalogue(%L)$q$, :'org_s'));
+select pg_temp.as_ctx(:'bob', :'org_t');
+select (app.load_sample_catalogue(:'org_t')->>'loaded')::int as nt \gset
+select pg_temp.ok('org B loads only its own (fashion) samples', :nt = 5 and (select count(*) from products where sample_key is not null) = 5 and (select count(*) from products where sample_key like 'electronics-%') = 0);
+select pg_temp.ok('org B still sees none of org S inventory', (select count(*) from products where org_id = :'org_s') = 0);
+
+-- fractional vs whole-unit samples (building materials: sold by bag, weight or roll)
+select pg_temp.as_ctx(:'alice', :'org_m');
+select (app.load_sample_catalogue(:'org_m')->>'loaded')::int as nm \gset
+select pg_temp.ok('building materials load 6 samples', :nm = 6);
+select pg_temp.ok('sand by the tonne is fractional and exact (12.500)', (select p.allow_fractional and sl.on_hand = 12500 from stock_levels sl join variants v on v.id = sl.variant_id join products p on p.id = v.product_id where v.sku = 'SMP-BUILDING-MATERIALS-02'));
+select pg_temp.ok('nails by the kilo are fractional and exact (60.250)', (select p.allow_fractional and sl.on_hand = 60250 from stock_levels sl join variants v on v.id = sl.variant_id join products p on p.id = v.product_id where v.sku = 'SMP-BUILDING-MATERIALS-05'));
+select pg_temp.ok('cement by the bag is whole-unit', (select not p.allow_fractional and sl.on_hand = 200000 from stock_levels sl join variants v on v.id = sl.variant_id join products p on p.id = v.product_id where v.sku = 'SMP-BUILDING-MATERIALS-01'));
+select pg_temp.ok('every whole-unit sample has whole-unit stock and reorder level', (select count(*) from stock_levels sl join variants v on v.id = sl.variant_id join products p on p.id = v.product_id where p.org_id = :'org_m' and not p.allow_fractional and (sl.on_hand % 1000 <> 0 or v.reorder_level % 1000 <> 0)) = 0);
+select pg_temp.ok('every sample balance equals the sum of its movements', (select count(*) from stock_levels sl where sl.org_id = :'org_m' and sl.on_hand <> (select coalesce(sum(m.delta), 0) from stock_movements m where m.variant_id = sl.variant_id)) = 0);
+
+-- a legacy business type has no sample set: loading is a harmless no-op
+select pg_temp.as_ctx(:'alice', :'org_a');
+select pg_temp.ok('a legacy business type loads nothing', (app.load_sample_catalogue(:'org_a')->>'loaded')::int = 0);
+
+-- forging the flags is impossible for the app role
+select pg_temp.as_ctx(:'ivy', :'org_s');
+insert into products (org_id, name, created_by) values (:'org_s', 'Real Item', :'ivy') returning id as prod_real \gset
+insert into variants (org_id, product_id, sku, price_minor) values (:'org_s', :'prod_real', 'REAL-1', 5000) returning id as var_real \gset
+insert into variant_costs (variant_id, org_id, cost_minor) values (:'var_real', :'org_s', 3000);
+insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (:'org_s', :'var_real', 4000, 'opening', :'ivy');
+select pg_temp.blocked('app role cannot create a product with a sample_key', format($q$insert into products (org_id, name, created_by, sample_key) values (%L, 'Forged', %L, 'forged-01')$q$, :'org_s', :'ivy'));
+select pg_temp.blocked('app role cannot flag a real product as a sample', format($q$update products set sample_key = 'forged-02' where id = %L$q$, :'prod_real'));
+select pg_temp.blocked('app role cannot clear the sample flag', $q$update products set sample_key = null where sample_key is not null$q$);
+select pg_temp.blocked('app role cannot create a flagged stock movement', format($q$insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id, is_sample) values (%L, %L, 1000, 'purchase', %L, true)$q$, :'org_s', :'var_real', :'ivy'));
+select set_config('app.sample_purge', 'on', false);
+select pg_temp.blocked('the purge flag does not let the app role delete sample movements', $q$delete from stock_movements where is_sample$q$);
+select pg_temp.blocked('the purge flag does not let the app role delete real movements', format($q$delete from stock_movements where variant_id = %L$q$, :'var_real'));
+select set_config('app.sample_purge', 'off', false);
+select pg_temp.blocked('app role cannot delete sample variants directly', $q$delete from variants where sku like 'SMP-%'$q$);
+select pg_temp.blocked('app role cannot delete sample products directly', $q$delete from products where sample_key is not null$q$);
+select pg_temp.blocked('real movements stay immutable', format($q$update stock_movements set delta = 9000 where variant_id = %L$q$, :'var_real'));
+
+-- delete: only untouched samples go; a sample with REAL stock history is kept; real products are never touched
+select v.id as v_keep from variants v where v.org_id = :'org_s' and v.sku = 'SMP-ELECTRONICS-01' \gset
+insert into stock_movements (org_id, variant_id, delta, reason, actor_user_id) values (:'org_s', :'v_keep', 5000, 'purchase', :'ivy');
+select pg_temp.ok('a real purchase on a sample is recorded exactly', (select on_hand from stock_levels where variant_id = :'v_keep') = 13000);
+select pg_temp.as_ctx(:'ivy', :'org_s');
+select pg_temp.ok('status shows 4 deletable and 1 kept', (app.sample_catalogue_status(:'org_s')->>'deletable')::int = 4 and (app.sample_catalogue_status(:'org_s')->>'keptWithHistory')::int = 1);
+select (d->>'deleted')::int as nd, jsonb_array_length(d->'kept') as nk, d->'kept'->0->>'name' as kept_name from (select app.delete_sample_catalogue(:'org_s') as d) x \gset
+select pg_temp.ok('delete removed the 4 untouched samples and kept the one with real history', :nd = 4 and :nk = 1 and :'kept_name' = 'Smartphone 64GB');
+select pg_temp.ok('the kept sample keeps its exact balance', (select on_hand from stock_levels where variant_id = :'v_keep') = 13000);
+select pg_temp.ok('the real product, its cost and its stock are untouched', (select count(*) from products where id = :'prod_real') = 1 and (select on_hand from stock_levels where variant_id = :'var_real') = 4000 and (select cost_minor from variant_costs where variant_id = :'var_real') = 3000);
+select pg_temp.ok('only the kept sample remains flagged', (select count(*) from products where org_id = :'org_s' and sample_key is not null) = 1 and (select count(*) from products where org_id = :'org_s') = 2);
+select pg_temp.ok('deleted samples left no stock rows behind', (select count(*) from stock_levels where org_id = :'org_s') = 2 and (select count(*) from stock_movements where org_id = :'org_s') = 3);
+select (d->>'deleted')::int as nd2, jsonb_array_length(d->'kept') as nk2 from (select app.delete_sample_catalogue(:'org_s') as d) x \gset
+select pg_temp.ok('a second delete changes nothing', :nd2 = 0 and :nk2 = 1);
+select pg_temp.as_ctx(:'alice', :'org_m');
+select pg_temp.ok('org M still has all 6 samples', (select count(*) from products where org_id = :'org_m' and sample_key is not null) = 6);
+
+-- reload after delete brings back only the missing samples (the kept one is not duplicated)
+select pg_temp.as_ctx(:'ivy', :'org_s');
+select (app.load_sample_catalogue(:'org_s')->>'loaded')::int as n3 \gset
+select pg_temp.ok('reload restores the 4 deleted samples without duplicating the kept one', :n3 = 4 and (select count(*) from products where org_id = :'org_s' and sample_key is not null) = 5);
+
+-- a real item that already uses a sample SKU is never overwritten: that sample is skipped
+select pg_temp.as_ctx(:'bob', :'org_t');
+insert into products (org_id, name, created_by) values (:'org_t', 'My own jeans', :'bob') returning id as prod_own \gset
+select app.delete_sample_catalogue(:'org_t');
+select pg_temp.ok('org B samples deleted; org B real product kept', (select count(*) from products where org_id = :'org_t') = 1 and (select name from products where id = :'prod_own') = 'My own jeans');
+insert into variants (org_id, product_id, sku, price_minor) values (:'org_t', :'prod_own', 'SMP-FASHION-01', 100);
+select (d->>'loaded')::int as n4, (d->>'skippedSkuTaken')::int as s4 from (select app.load_sample_catalogue(:'org_t') as d) x \gset
+select pg_temp.ok('a SKU already used by a real item is skipped, not overwritten', :n4 = 4 and :s4 = 1 and (select price_minor from variants where sku = 'SMP-FASHION-01') = 100 and (select sample_key from products where id = :'prod_own') is null);
+
+-- audit trail
+select pg_temp.as_ctx(:'alice', :'org_s');
+select pg_temp.ok('loads and deletes are audited with the real actor', (select count(*) from audit_logs where org_id = :'org_s' and action = 'catalogue.sample_load' and actor_user_id = :'ivy') = 2 and (select count(*) from audit_logs where org_id = :'org_s' and action = 'catalogue.sample_delete' and actor_user_id = :'ivy' and (metadata->>'deleted')::int = 4 and (metadata->>'kept')::int = 1) = 1);
+
 \echo ALL RLS ATTACK TESTS PASSED

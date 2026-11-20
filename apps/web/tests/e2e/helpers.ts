@@ -41,11 +41,14 @@ export async function loginViaUi(page: Page, email: string, password = PASSWORD)
   await page.getByRole("button", { name: /log in/i }).click();
 }
 
-export async function createWorkspace(page: Page, name: string) {
+/** Walks the onboarding screen. Defaults keep the catalogue empty ("General trade", no samples) so other specs are unaffected. */
+export async function createWorkspace(page: Page, name: string, opts: { type?: string; phone?: string; samples?: boolean } = {}) {
   await page.waitForURL(/\/onboarding$/);
   await page.getByLabel("Business name").fill(name);
-  await page.getByLabel(/what kind of business/i).selectOption("retail");
-  await page.getByRole("button", { name: /create workspace/i }).click();
+  if (opts.phone) await page.getByLabel(/phone number/i).fill(opts.phone);
+  await page.getByRole("radio", { name: new RegExp(`^${opts.type ?? "General trade"}`) }).check();
+  if (opts.samples) await page.getByLabel(/load a sample catalogue/i).check();
+  await page.getByRole("button", { name: /finish setup/i }).click();
   await page.waitForURL(/\/dashboard$/);
 }
 

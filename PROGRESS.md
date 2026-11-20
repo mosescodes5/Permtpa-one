@@ -1,5 +1,47 @@
 # PROGRESS LOG — PERMTPA ONE
 
+## Milestone 4 · Step 2 — Business-type onboarding + deletable sample catalogue: **WRITTEN, PARTLY VERIFIED (web only)**
+Authored in a sandbox with **no Rust, PostgreSQL or Redis** (no `cargo`, `psql`, `redis-server`). Node was available, so the web side was actually run.
+
+### State recorded at the start of this step
+- Step 1 (migration 0009): the developer reported it **green in CI and working by hand in Codespaces**. The three CI results (Playwright pass/skip counts from the `e2e` job, the last line of `scripts/test-db.sh`, the `test-0009-upgrade.sh` result lines) have **not yet been pasted**, so **no Step 1 counts are recorded here**. The five Step 1 mutation checks are still owed.
+
+### Delivered (UNVERIFIED except where stated)
+- **Migration 0010** (`0010_business_types_and_samples.sql`):
+  - `business_types` gains description, sort order, `selectable`, and the capability flags `tracks_expiry`, `sold_by_weight`, `has_tables`, `has_bookings`. 12 types are offered; the four older codes (retail, agriculture, distribution, agency) stay valid for existing organizations but are hidden. Capabilities are read through the organization's type (join), so they cannot drift; the app role has SELECT only.
+  - `organizations.phone` (optional, shape-checked; owner/administrator only via existing RLS).
+  - Sample flags: `products.sample_key`, `stock_movements.is_sample`. The app role cannot create them (RLS `WITH CHECK` on products and movements) or change them (no UPDATE grant).
+  - `sample_catalogue_items` (61 rows, 12 types; holds cost prices, so no grant and RLS with no policy). Data checked by a generator script against the same rules the table enforces.
+  - `app.load_sample_catalogue`, `app.delete_sample_catalogue`, `app.sample_catalogue_status` (SECURITY DEFINER, pinned search_path, role and tenant checked inside the function).
+  - **Append-only exception (needs your review):** `stock_movements` is still append-only except that a row flagged `is_sample` may be deleted while `delete_sample_catalogue()` runs (transaction-local flag `app.sample_purge`). The app role has no DELETE privilege at all, so the flag is useless to it; real movements can never be deleted.
+- **API** (`src/onboarding.rs`): `GET /v1/business-types`, `GET|POST|DELETE /v1/orgs/{id}/sample-catalogue`; org profile now returns `phone` and `capabilities`; `PATCH /v1/orgs/{id}` accepts `phone` (empty clears); products return `isSample`.
+- **Web**: onboarding screen with 12 cards, optional phone, sample checkbox, "Finish setup"; Organization page uses the API list and edits the phone; Inventory shows a "Sample" badge, inline confirm before deleting, "Load sample catalogue" from the empty state.
+- **Behaviour actually implemented from capability flags in this step:** `sold_by_weight` types get fractional sample products. `tracks_expiry`, `has_tables`, `has_bookings` are **stored and exposed only**; the expiry, tables and bookings features do not exist yet.
+
+### Verified here (actually run in the sandbox)
+- Web: `tsc --noEmit` clean, `eslint` clean, Vitest **54 passed (6 files)**, including 7 new onboarding-form tests and 3 new schema tests.
+- Sample data generator: all 61 rows satisfy the key/SKU/price/whole-unit rules.
+
+### NOT verified
+Everything Rust and SQL: `cargo fmt/clippy/test`, migration 0010 on a real database, the SQL attack suite additions, `tests/onboarding.rs` (12 DB-backed tests), Playwright (new `onboarding.spec.ts` and the changed `createWorkspace` helper), Docker, real SMTP, Windows, mobile browsers. Run `cargo fmt --all` first: the Rust was written without rustfmt.
+
+### Mutation checks owed for Step 2 (throwaway branch + draft PR; expect RED)
+1. Remove `and sample_key is null` from the `products_insert` policy: the SQL suite "cannot create a product with a sample_key" must fail.
+2. Remove `and is_sample = false` from `movements_insert`: "cannot create a flagged stock movement" must fail.
+3. In `stock_movements_immutable()`, drop the `old.is_sample` condition: the trigger test and SQL "real movements" assertions must fail.
+4. In `delete_sample_catalogue`, drop the `m.is_sample = false` history check: the "kept with real history" tests must fail.
+5. In `load_sample_catalogue`, remove the `p_org is distinct from app.current_org_id()` test: cross-tenant SQL tests must fail.
+6. Remove `on conflict ... do nothing` handling or the `sample_key` unique index: `concurrent_loads_never_duplicate` must fail (may need several runs).
+7. `grant select on sample_catalogue_items to permtpa_app`: the cost-leak assertions must fail.
+
+### Known gaps
+- Service-type businesses (salon, car wash, services, hotel) get sample *goods*; a "service with no stock" item type does not exist yet.
+- Sample products have no categories (avoids leftover empty categories on delete).
+- A kept sample (it has real history) stays flagged "Sample"; there is no "keep as a normal product" action yet.
+- Legacy business-type codes are still accepted by the API and database (many existing tests use them); they are only hidden from the picker.
+- The add-product form does not yet default "allow decimals" from `soldByWeight`.
+- Your list says 11 business types but names 12; 12 are implemented.
+
 ## Milestone 4 · Step 1 — Fractional quantities: **WRITTEN, NOT VERIFIED**
 Authored in a sandbox with no Rust, PostgreSQL, Redis or network. **Nothing below has been compiled or run.** The developer verifies in VS Code / CI (`.github/workflows/ci.yml`, plus the new `scripts/test-0009-upgrade.sh` step).
 The Milestone 3 baseline (Vitest 35, Rust 30, DB 13/9/12/3/2, SQL 126, Playwright 29+7 skipped) was NOT re-verified; treat as unverified claims.

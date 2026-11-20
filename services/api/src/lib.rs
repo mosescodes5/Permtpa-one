@@ -9,6 +9,7 @@ pub mod error;
 pub mod inventory;
 pub mod mailer;
 pub mod mfa;
+pub mod onboarding;
 pub mod orgs;
 pub mod ratelimit;
 pub mod security;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema, passwordStrength, registerSchema } from "@/lib/validation";
+import { loginSchema, onboardingSchema, passwordStrength, registerSchema } from "@/lib/validation";
 
 const valid = { fullName: "Ada Okafor", email: "ada@example.com", password: "correct horse battery", acceptTerms: true };
 
@@ -19,5 +19,18 @@ describe("passwordStrength", () => {
     expect(passwordStrength("")).toBe(0);
     expect(passwordStrength("aaaaaaaaaaaa")).toBe(1);
     expect(passwordStrength("Correct-Horse-Battery-9")).toBe(4);
+  });
+});
+
+describe("onboardingSchema", () => {
+  const ok = { name: "Ada Stores", phone: "", businessType: "pharmacy", loadSamples: false };
+  it("accepts a name, a type and no phone", () => { expect(onboardingSchema.safeParse(ok).success).toBe(true); });
+  it("requires a business name and a business type", () => {
+    expect(onboardingSchema.safeParse({ ...ok, name: " " }).success).toBe(false);
+    expect(onboardingSchema.safeParse({ ...ok, businessType: "" }).success).toBe(false);
+  });
+  it("accepts well-formed phone numbers and rejects malformed ones", () => {
+    for (const p of ["+234 803 123 4567", "(0803) 123-4567", "08031234567"]) expect(onboardingSchema.safeParse({ ...ok, phone: p }).success).toBe(true);
+    for (const p of ["abc", "123456", "call me maybe", "0803+1234567"]) expect(onboardingSchema.safeParse({ ...ok, phone: p }).success).toBe(false);
   });
 });

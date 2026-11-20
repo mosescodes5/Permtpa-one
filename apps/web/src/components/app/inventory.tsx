@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Banner } from "@/components/auth/forms";
 import { useAuth } from "@/components/auth/auth-provider";
 import { CategoriesModal, HistoryModal, ProductForm, StockModal, VariantEditModal } from "@/components/app/inventory-modals";
-import { canManageInventory, canViewCosts, api, problemMessage, type Category, type LowStockItem, type Product, type Variant } from "@/lib/api";
+import { canManageInventory, canViewCosts, api, problemMessage, type Category, type LowStockItem, type Product, type SampleDeleteResult, type SampleLoadResult, type SampleStatus, type Variant } from "@/lib/api";
 import { formatMoney } from "@/lib/money";
 
 type Page = { items: Product[]; total: number; limit: number; offset: number };
@@ -36,6 +36,7 @@ export function Inventory() {
   const [category, setCategory] = useState(""); const [status, setStatus] = useState<"active" | "archived">("active"); const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<Page | null>(null); const [cats, setCats] = useState<Category[]>([]); const [low, setLow] = useState<LowStockItem[]>([]); const [value, setValue] = useState<{ totalMinor: string; unitsThousandths: number; variantsMissingCost: number } | null>(null);
   const [error, setError] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null); const [reload, setReload] = useState(0);
+  const [samples, setSamples] = useState<SampleStatus | null>(null); const [confirmSamples, setConfirmSamples] = useState(false); const [samplesBusy, setSamplesBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false); const [catsOpen, setCatsOpen] = useState(false);
   const [stock, setStock] = useState<Target>(null); const [hist, setHist] = useState<Target>(null); const [edit, setEdit] = useState<Target>(null);
   const bump = useCallback(() => setReload((n) => n + 1), []);
@@ -55,10 +56,24 @@ export function Inventory() {
     if (!orgId) return;
     api<{ categories: Category[] }>(`/v1/orgs/${orgId}/categories`).then((r) => { if (alive) setCats(r.categories); }).catch(() => {});
     api<{ items: LowStockItem[] }>(`/v1/orgs/${orgId}/inventory/low-stock`).then((r) => { if (alive) setLow(r.items); }).catch(() => {});
+    api<SampleStatus>(`/v1/orgs/${orgId}/sample-catalogue`).then((r) => { if (alive) setSamples(r); }).catch(() => {});
     if (seeCosts) api<{ totalMinor: string; unitsThousandths: number; variantsMissingCost: number }>(`/v1/orgs/${orgId}/inventory/valuation`).then((r) => { if (alive) setValue(r); }).catch(() => {});
     return () => { alive = false; };
   }, [orgId, seeCosts, reload]);
 
+  async function loadSamples() {
+    setSamplesBusy(true); setError(null); setNotice(null);
+    try { const r = await api<SampleLoadResult>(`/v1/orgs/${orgId}/sample-catalogue`, { method: "POST" }); setNotice(r.loaded === 1 ? "1 sample product was added." : `${r.loaded} sample products were added.`); bump(); }
+    catch (e) { setError(problemMessage(e)); } finally { setSamplesBusy(false); }
+  }
+  async function deleteSamples() {
+    setSamplesBusy(true); setError(null); setNotice(null);
+    try {
+      const r = await api<SampleDeleteResult>(`/v1/orgs/${orgId}/sample-catalogue`, { method: "DELETE" });
+      const kept = r.kept.length > 0 ? ` ${r.kept.length === 1 ? "1 sample was" : `${r.kept.length} samples were`} kept because of real stock history: ${r.kept.map((k) => k.name).join(", ")}.` : "";
+      setNotice(`${r.deleted === 1 ? "1 sample product was" : `${r.deleted} sample products were`} deleted.${kept}`); setConfirmSamples(false); bump();
+    } catch (e) { setError(problemMessage(e)); } finally { setSamplesBusy(false); }
+  }
   async function setArchived(p: Product, archived: boolean) {
     try { await api(`/v1/orgs/${orgId}/products/${p.id}`, { method: "PATCH", body: { status: archived ? "archived" : "active" } }); setNotice(`${p.name} was ${archived ? "archived" : "restored"}.`); bump(); } catch (e) { setError(problemMessage(e)); }
   }
@@ -73,6 +88,22 @@ export function Inventory() {
       </div>
       {error && <Banner tone="error">{error}</Banner>}
       {notice && <Banner tone="success">{notice}</Banner>}
+      {manage && samples && samples.present > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-subtle p-3.5 text-sm">
+          {confirmSamples
+            ? <p className="text-fg">Delete {samples.deletable} sample product{samples.deletable === 1 ? "" : "s"}? Your own products are never touched. {samples.keptWithHistory > 0 ? `${samples.keptWithHistory} with real stock history will be kept.` : ""}</p>
+            : <p className="text-muted">{samples.present} sample product{samples.present === 1 ? " is" : "s are"} in your catalogue. They are marked “Sample”.</p>}
+          {confirmSamples
+            ? <div className="flex gap-2"><Button variant="secondary" size="sm" disabled={samplesBusy} onClick={() => setConfirmSamples(false)}>Cancel</Button><Button variant="navy" size="sm" disabled={samplesBusy} onClick={() => void deleteSamples()}>Yes, delete samples</Button></div>
+            : <Button variant="secondary" size="sm" onClick={() => setConfirmSamples(true)}>Delete sample products</Button>}
+        </div>
+      )}
+      {manage && samples && samples.loadable > 0 && samples.present === 0 && page && page.total === 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-bg-subtle p-3.5 text-sm">
+          <p className="text-muted">Add a few example products so you can test a sale immediately. You can delete them later.</p>
+          <Button variant="secondary" size="sm" disabled={samplesBusy} onClick={() => void loadSamples()}>Load sample catalogue</Button>
+        </div>
+      )}
 
       <section aria-label="Summary" className="grid gap-4 sm:grid-cols-3">
         <Card data-hover-scope className="lift rise"><CardContent><p className="flex items-center gap-2 text-sm text-muted"><Box className="size-4 text-accent" />Products</p><p className="tabular font-display mt-2 text-[2rem] leading-none" data-testid="kpi-products">{page?.total ?? "—"}</p><p className="mt-3 text-xs text-subtle">{status === "active" ? "active" : "archived"}</p></CardContent></Card>
@@ -103,7 +134,7 @@ export function Inventory() {
               <thead><tr className="border-b border-border text-left text-xs text-subtle"><th className="px-5 py-3 font-medium">Item</th><th className="px-3 py-3 font-medium">SKU</th><th className="px-3 py-3 text-right font-medium">Price</th>{seeCosts && <th className="px-3 py-3 text-right font-medium">Cost</th>}<th className="px-3 py-3 text-right font-medium">On hand</th><th className="px-5 py-3 text-right font-medium"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>{page.items.map((p) => p.variants.map((v, i) => (
                 <tr key={v.id} data-testid="variant-row" className="border-b border-border transition-colors last:border-0 hover:bg-bg-subtle">
-                  <td className="px-5 py-3.5">{i === 0 ? <><p className="font-medium">{p.name}</p><p className="text-xs text-subtle">{p.category ?? "No category"} · {p.unit}</p></> : <span className="text-xs text-subtle">↳</span>}{v.name !== "Default" && <p className="text-xs text-muted">{v.name}</p>}</td>
+                  <td className="px-5 py-3.5">{i === 0 ? <><p className="font-medium">{p.name}{p.isSample && <Badge className="ml-2">Sample</Badge>}</p><p className="text-xs text-subtle">{p.category ?? "No category"} · {p.unit}</p></> : <span className="text-xs text-subtle">↳</span>}{v.name !== "Default" && <p className="text-xs text-muted">{v.name}</p>}</td>
                   <td className="px-3 py-3.5 font-mono text-xs text-muted">{v.sku}</td>
                   <td className="tabular px-3 py-3.5 text-right">{formatMoney(v.priceMinor)}</td>
                   {seeCosts && <td className="tabular px-3 py-3.5 text-right text-muted">{v.costMinor != null ? formatMoney(v.costMinor) : "—"}</td>}

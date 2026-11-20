@@ -39,5 +39,12 @@ export type ResetInput = z.infer<typeof resetSchema>;
 export const inviteSchema = z.object({ email: emailSchema, role: z.string().min(1, "Choose a role") });
 export type InviteInput = z.infer<typeof inviteSchema>;
 
-export const onboardingSchema = z.object({ name: z.string().trim().min(2, "Enter your business name").max(120), businessType: z.string().min(1, "Choose a business type") });
+/** Optional. Mirrors the server and database rule: digits, spaces, ( ) -, optional leading +, 7-20 characters. */
+export const PHONE_PATTERN = /^\+?[0-9 ()-]{7,20}$/;
+export const onboardingSchema = z.object({
+  name: z.string().trim().min(2, "Enter your business name").max(120),
+  phone: z.string().trim().refine((v) => v === "" || PHONE_PATTERN.test(v), "Enter a valid phone number"),
+  businessType: z.string().min(1, "Choose a business type"),
+  loadSamples: z.boolean(),
+});
 export type OnboardingInput = z.infer<typeof onboardingSchema>;

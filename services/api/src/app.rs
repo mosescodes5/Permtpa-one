@@ -109,6 +109,13 @@ pub fn router(state: AppState) -> Router {
             "/v1/invitations/accept",
             post(crate::team::accept_invitation),
         )
+        .route("/v1/business-types", get(crate::onboarding::business_types))
+        .route(
+            "/v1/orgs/{org_id}/sample-catalogue",
+            get(crate::onboarding::sample_status)
+                .post(crate::onboarding::sample_load)
+                .delete(crate::onboarding::sample_delete),
+        )
         .route(
             "/v1/orgs/{org_id}/categories",
             get(crate::inventory::categories_list).post(crate::inventory::category_create),
